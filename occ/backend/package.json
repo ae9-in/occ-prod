@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy",
+    "prisma:deploy": "node scripts/prisma-deploy.js",
     "prisma:seed": "prisma db seed",
     "db:check": "node scripts/healthcheck.js --db-check",
     "loadtest": "node scripts/loadtest.js"
