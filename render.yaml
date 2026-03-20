@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: occ-backend
+    runtime: node
+    rootDir: occ/backend
+    plan: starter
+    autoDeploy: true
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm run prisma:deploy && npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: occ-db
+          property: connectionString
+      - key: DIRECT_URL
+        fromDatabase:
+          name: occ-db
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+    disk:
+      name: uploads
+      mountPath: /var/data
+      sizeGB: 1
+
+databases:
+  - name: occ-db
+    plan: starter

@@ -25,9 +25,12 @@ npm run dev
 
 ## Render deployment
 
-The repository now includes a Render blueprint at [`render.yaml`](/D:/occ%20application%203/occ/render.yaml).
+The repository now includes Render blueprints at:
 
-It provisions:
+- [`render.yaml`](/D:/occ%20application%203/render.yaml) for the actual Git repo root
+- [`occ/render.yaml`](/D:/occ%20application%203/occ/render.yaml) if you ever deploy from the nested `occ` directory directly
+
+The root-level blueprint provisions:
 
 - `occ-backend` web service
 - `occ-db` PostgreSQL database
