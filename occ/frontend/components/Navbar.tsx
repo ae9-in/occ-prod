@@ -1,13 +1,21 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Compass, LogIn, LogOut, IndianRupee } from "lucide-react";
+import { LayoutDashboard, Compass, LogIn, LogOut, IndianRupee, UserPlus } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useTransition } from "@/context/TransitionContext";
+import ImageWithFallback from "@/components/ImageWithFallback";
 
 export default function Navbar() {
   const { user, logout, isLoggedIn } = useUser();
   const { triggerTransition, isTransitioning } = useTransition();
+  const isHydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+  const showAuthenticatedNav = isHydrated && isLoggedIn;
   const profileImageSrc = user?.profilePicture?.trim() || null;
 
   const handleLogout = () => {
@@ -44,7 +52,7 @@ export default function Navbar() {
             <IndianRupee className="w-4 h-4" /> Earn
           </Link>
           
-          {isLoggedIn ? (
+          {showAuthenticatedNav ? (
             <>
               <div className="flex items-center gap-4">
                 <Link
@@ -55,8 +63,9 @@ export default function Navbar() {
                 >
                   <div className="w-8 h-8 rounded-full bg-brutal-blue border-2 border-black flex items-center justify-center">
                     {profileImageSrc ? (
-                      <img 
+                      <ImageWithFallback
                         src={profileImageSrc} 
+                        fallbackSrc="/globe.svg"
                         alt={user?.name || "User"}
                         className="w-full h-full rounded-full object-cover"
                       />
@@ -80,9 +89,14 @@ export default function Navbar() {
               </div>
             </>
           ) : (
-            <Link href="/login" onClick={(e) => handleNavigation(e, "/login")} className="bg-black text-white px-8 py-3 font-black uppercase text-sm border-2 border-black shadow-[4px_4px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center gap-2">
-              <LogIn className="w-4 h-4" /> Login
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/register" onClick={(e) => handleNavigation(e, "/register")} className="bg-white text-black px-6 py-3 font-black uppercase text-sm border-2 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center gap-2">
+                <UserPlus className="w-4 h-4" /> Join OCC
+              </Link>
+              <Link href="/login" onClick={(e) => handleNavigation(e, "/login")} className="bg-black text-white px-8 py-3 font-black uppercase text-sm border-2 border-black shadow-[4px_4px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center gap-2">
+                <LogIn className="w-4 h-4" /> Login
+              </Link>
+            </div>
           )}
         </div>
 
@@ -97,7 +111,7 @@ export default function Navbar() {
           <Link href="/earn" onClick={(e) => handleNavigation(e, "/earn")} className="p-2 border-2 border-black hover:bg-brutal-gray transition-colors" aria-label="Earn">
             <IndianRupee className="w-5 h-5"/>
           </Link>
-          {isLoggedIn ? (
+          {showAuthenticatedNav ? (
             <>
               <Link
                 href="/profile"
@@ -107,8 +121,9 @@ export default function Navbar() {
               >
                 <div className="w-5 h-5 rounded-full bg-brutal-blue border border-black flex items-center justify-center overflow-hidden">
                   {profileImageSrc ? (
-                    <img
+                    <ImageWithFallback
                       src={profileImageSrc}
+                      fallbackSrc="/globe.svg"
                       alt={user?.name || "User"}
                       className="w-full h-full object-cover"
                     />
@@ -128,9 +143,14 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <Link href="/login" onClick={(e) => handleNavigation(e, "/login")} className="p-2 bg-black text-white border-2 border-black hover:bg-brutal-blue hover:translate-x-1 transition-all" aria-label="Login">
-              <LogIn className="w-5 h-5"/>
-            </Link>
+            <>
+              <Link href="/register" onClick={(e) => handleNavigation(e, "/register")} className="p-2 border-2 border-black bg-white hover:bg-brutal-gray transition-colors" aria-label="Register">
+                <UserPlus className="w-5 h-5"/>
+              </Link>
+              <Link href="/login" onClick={(e) => handleNavigation(e, "/login")} className="p-2 bg-black text-white border-2 border-black hover:bg-brutal-blue hover:translate-x-1 transition-all" aria-label="Login">
+                <LogIn className="w-5 h-5"/>
+              </Link>
+            </>
           )}
         </div>
       </div>

@@ -30,6 +30,7 @@ export interface Post {
 
 export interface Club {
   id: string;
+  slug?: string;
   name: string;
   description: string;
   logo: string;
@@ -43,6 +44,15 @@ export interface Club {
   membersCount?: number;
   eventsCount?: number;
   isJoined?: boolean;
+  isOwner?: boolean;
+  visibility?: "PUBLIC" | "PRIVATE";
+  membershipRole?: "OWNER" | "ADMIN" | "MEMBER" | null;
+  hasPendingJoinRequest?: boolean;
+  canJoin?: boolean;
+  canRequestToJoin?: boolean;
+  canLeave?: boolean;
+  canEdit?: boolean;
+  canPost?: boolean;
 }
 
 export interface UserProfile {
@@ -59,6 +69,11 @@ export interface ClubMembership {
   name: string;
   role: string;
   logo: string;
+  description?: string;
+  university?: string;
+  category?: string;
+  slug?: string;
+  joinedAt?: string;
 }
 
 export interface ClubMember {

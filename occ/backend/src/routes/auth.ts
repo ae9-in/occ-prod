@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { validate } from "../middleware/validate";
@@ -11,19 +12,37 @@ import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
-  getRefreshExpiryDate
+  getRefreshExpiryDate,
+  hashStoredToken
 } from "../lib/tokens";
 import { serializeUser } from "../utils/serializers";
 
 const router = Router();
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many authentication attempts. Please try again later.",
+    errors: []
+  }
+});
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   displayName: z.string().min(2).max(80),
   bio: z.string().max(280).optional(),
-  university: z.string().max(120).optional(),
-  phoneNumber: z.string().max(30).optional(),
+  university: z.string().trim().min(2).max(120),
+  phoneNumber: z
+    .string()
+    .trim()
+    .min(10)
+    .max(30)
+    .regex(/^[+]?[\d\s\-()]{10,30}$/, "Please provide a valid phone number"),
   hobbies: z.string().max(240).optional()
 });
 
@@ -36,13 +55,17 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(10)
 });
 
+const logoutSchema = z.object({
+  refreshToken: z.string().min(10).optional()
+});
+
 async function issueTokens(user: { id: string; role: any; email?: string }) {
   const accessToken = signAccessToken({ id: user.id, role: user.role, email: user.email || "" });
   const refreshToken = signRefreshToken({ id: user.id, role: user.role });
   await prisma.refreshToken.create({
     data: {
       userId: user.id,
-      token: refreshToken,
+      token: hashStoredToken(refreshToken),
       expiresAt: getRefreshExpiryDate()
     }
   });
@@ -51,6 +74,7 @@ async function issueTokens(user: { id: string; role: any; email?: string }) {
 
 router.post(
   "/auth/register",
+  authLimiter,
   validate(registerSchema),
   asyncHandler(async (req, res) => {
     const existingUser = await prisma.user.findUnique({ where: { email: req.body.email } });
@@ -102,6 +126,7 @@ router.post(
 
 router.post(
   "/auth/login",
+  authLimiter,
   validate(loginSchema),
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
@@ -121,10 +146,11 @@ router.post(
 
 router.post(
   "/auth/logout",
+  validate(logoutSchema),
   asyncHandler(async (req, res) => {
     const refreshToken = req.body.refreshToken;
     if (refreshToken) {
-      await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+      await prisma.refreshToken.deleteMany({ where: { token: hashStoredToken(refreshToken) } });
     }
     return successResponse(res, "Logout successful", {});
   })
@@ -132,11 +158,12 @@ router.post(
 
 router.post(
   "/auth/refresh",
+  authLimiter,
   validate(refreshSchema),
   asyncHandler(async (req, res) => {
     const storedToken = await prisma.refreshToken.findFirst({
       where: {
-        token: req.body.refreshToken,
+        token: hashStoredToken(req.body.refreshToken),
         expiresAt: { gt: new Date() }
       },
       include: {

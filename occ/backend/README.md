@@ -23,6 +23,30 @@ npx prisma db seed
 npm run dev
 ```
 
+## Render deployment
+
+The repository now includes a Render blueprint at [`render.yaml`](/D:/occ%20application%203/occ/render.yaml).
+
+It provisions:
+
+- `occ-backend` web service
+- `occ-db` PostgreSQL database
+- persistent disk mounted at `/var/data` for uploads
+
+Required manual env values on Render before going live:
+
+- `CORS_ORIGIN`
+- `APP_URL`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+
+Recommended values:
+
+- `CORS_ORIGIN`: your Vercel frontend URL, for example `https://occ-frontend-next.vercel.app`
+- `APP_URL`: your Render backend public URL
+- `ADMIN_EMAIL`: your real admin email
+- `ADMIN_PASSWORD`: a strong rotated admin password, not the default local seed value
+
 ## Scripts
 
 - `npm run dev`

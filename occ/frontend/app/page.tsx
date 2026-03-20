@@ -2,14 +2,36 @@
 
 import { Zap, Users, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import { mockPosts } from "@/lib/mockData/posts";
 import PostCard from "@/components/PostCard";
 import InteractiveGrid from "@/components/InteractiveGrid";
 import EnhancedHero from "@/components/EnhancedHero";
+import { useEffect, useState } from "react";
+import { type Post } from "@/lib/dataProvider";
+import { listFeedFromApi } from "@/lib/postApi";
 
 export default function Home() {
-  // Use first 3 posts for the homepage preview
-  const featuredPosts = mockPosts.slice(0, 3);
+  const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadFeaturedPosts = async () => {
+      try {
+        const feed = await listFeedFromApi(1, 3);
+        if (!isActive) return;
+        setFeaturedPosts(feed.items);
+      } catch {
+        if (!isActive) return;
+        setFeaturedPosts([]);
+      }
+    };
+
+    loadFeaturedPosts();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col items-center bg-brutal-gray min-h-screen relative">
@@ -29,9 +51,18 @@ export default function Home() {
         </div>
         
         <div className="space-y-12">
-          {featuredPosts.map(post => (
-            <PostCard key={post.id} post={post} />
-          ))}
+          {featuredPosts.length > 0 ? (
+            featuredPosts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))
+          ) : (
+            <div className="bg-white border-4 border-black p-10 shadow-[8px_8px_0_0_#000]">
+              <h3 className="text-3xl font-black uppercase tracking-tighter text-black">Community Feed</h3>
+              <p className="mt-3 font-bold text-black/70">
+                No posts are in the database yet. Sign in with the admin account to start the network cleanly.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-16 text-center">

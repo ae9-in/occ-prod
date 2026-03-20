@@ -7,16 +7,20 @@ import { UserCircle, Settings, Mail, Calendar, User, BookOpen, LogOut, X, Users,
 import { type ClubMembership, type ActivityStats } from "@/lib/dataProvider";
 import { useUser } from "@/context/UserContext";
 import PostCard from "@/components/PostCard";
+import ModalShell from "@/components/ModalShell";
+import ImageWithFallback from "@/components/ImageWithFallback";
+import { fetchCurrentProfile } from "@/lib/authApi";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, updateUser, logout, isLoggedIn, posts, getMembershipItems, leaveClub } = useUser();
+  const { user, updateUser, logout, isLoggedIn, isAuthLoading, posts, getMembershipItems, leaveClub } = useUser();
   const profileImageInputRef = useRef<HTMLInputElement>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [confirmLeaveClub, setConfirmLeaveClub] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState<Partial<typeof user>>({});
   const [memberships, setMemberships] = useState<ClubMembership[]>([]);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [activityStats, setActivityStats] = useState<ActivityStats>({ postsCreated: 0, clubsJoined: 0, eventsAttended: 0 });
   const [profileImageError, setProfileImageError] = useState("");
   const profileImageSrc = user?.profilePicture?.trim() || null;
@@ -28,14 +32,43 @@ export default function ProfilePage() {
 
   // Redirect if not logged in
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!isAuthLoading && !isLoggedIn) {
       router.push("/login");
     }
-  }, [isLoggedIn, router]);
+  }, [isAuthLoading, isLoggedIn, router]);
 
   useEffect(() => {
-    setMemberships(getMembershipItems());
-  }, [getMembershipItems, user]);
+    if (isAuthLoading) return;
+    if (!isLoggedIn) {
+      setMemberships([]);
+      setIsProfileLoading(false);
+      return;
+    }
+
+    let isActive = true;
+
+    const loadProfile = async () => {
+      setIsProfileLoading(true);
+      try {
+        const profile = await fetchCurrentProfile();
+        if (!isActive) return;
+        setMemberships(profile.memberships);
+      } catch {
+        if (!isActive) return;
+        setMemberships(getMembershipItems());
+      } finally {
+        if (isActive) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isActive = false;
+    };
+  }, [getMembershipItems, isAuthLoading, isLoggedIn]);
 
   useEffect(() => {
     setActivityStats({
@@ -66,9 +99,10 @@ export default function ProfilePage() {
     }
   }, [editForm, updateUser]);
 
-  const handleLeaveClub = useCallback((clubId: string) => {
-    leaveClub(clubId);
-    setMemberships(prev => prev.filter(club => club.id !== clubId));
+  const handleLeaveClub = useCallback(async (clubId: string) => {
+    const left = await leaveClub(clubId);
+    if (!left) return;
+    setMemberships((prev) => prev.filter((club) => club.id !== clubId));
     setConfirmLeaveClub(null);
   }, [leaveClub]);
 
@@ -136,16 +170,20 @@ export default function ProfilePage() {
     }
   }, []);
 
-  if (!isLoggedIn || !user) {
-    return (
-      <div className="min-h-screen bg-brutal-gray flex items-center justify-center">
-        <p className="text-2xl font-black">Loading profile...</p>
-      </div>
-    );
-  }
+  const memberSinceLabel = user?.createdAt
+    ? new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(new Date(user.createdAt))
+    : "Recently joined";
 
   return (
     <div className="min-h-screen bg-brutal-gray">
+      {isAuthLoading || isProfileLoading || !isLoggedIn || !user ? (
+        <div className="mx-auto flex min-h-screen max-w-7xl items-center justify-center px-4 py-20">
+          <div className="bg-white border-4 border-black px-10 py-8 shadow-[8px_8px_0_0_#000]">
+            <p className="text-2xl font-black uppercase tracking-tight">Loading profile...</p>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Header */}
       <div className="bg-white text-black p-12 md:p-24 border-b-8 border-black relative overflow-hidden">
         <div className="absolute right-0 top-0 w-1/3 h-full bg-brutal-blue opacity-5 -skew-x-12 translate-x-1/2"></div>
@@ -247,60 +285,60 @@ export default function ProfilePage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 gap-12 xl:grid-cols-2 xl:items-start">
           {/* Profile Info Card */}
-          <div className="bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
+          <div className="min-w-0 h-full bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
             <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-4">
               Account Details
             </h2>
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="min-w-0 flex items-start gap-4">
                 <User className="w-6 h-6 mt-1" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-black uppercase text-sm text-gray-500 tracking-widest">Display Name</p>
-                  <p className="font-bold text-xl">{user.name}</p>
+                  <p className="font-bold text-xl break-words">{user.name}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
+              <div className="min-w-0 flex items-start gap-4">
                 <Mail className="w-6 h-6 mt-1" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-black uppercase text-sm text-gray-500 tracking-widest">Email</p>
-                  <p className="font-bold text-xl">{user.email}</p>
+                  <p className="font-bold text-xl break-words">{user.email}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
+              <div className="min-w-0 flex items-start gap-4">
                 <BookOpen className="w-6 h-6 mt-1" />
-                <div>
-                  <p className="font-black uppercase text-sm text-gray-500 tracking-widest">University</p>
-                  <p className="font-bold text-xl">{user.university}</p>
+                <div className="min-w-0">
+                  <p className="font-black uppercase text-sm text-gray-500 tracking-widest">College</p>
+                  <p className="font-bold text-xl break-words">{user.university || "Not added yet"}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
+              <div className="min-w-0 flex items-start gap-4">
                 <Phone className="w-6 h-6 mt-1" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-black uppercase text-sm text-gray-500 tracking-widest">Phone Number</p>
-                  <p className="font-bold text-xl">{user.phoneNumber || "Not added yet"}</p>
+                  <p className="font-bold text-xl break-words">{user.phoneNumber || "Not added yet"}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
+              <div className="min-w-0 flex items-start gap-4 sm:col-span-2">
                 <Sparkles className="w-6 h-6 mt-1" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-black uppercase text-sm text-gray-500 tracking-widest">Hobbies</p>
-                  <p className="font-bold text-xl">{user.hobbies || "Tell people what you're into"}</p>
+                  <p className="font-bold text-xl break-words">{user.hobbies || "Tell people what you're into"}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
+              <div className="min-w-0 flex items-start gap-4 sm:col-span-2">
                 <Calendar className="w-6 h-6 mt-1" />
-                <div>
+                <div className="min-w-0">
                   <p className="font-black uppercase text-sm text-gray-500 tracking-widest">Member Since</p>
-                  <p className="font-bold text-xl">January 2024</p>
+                  <p className="font-bold text-xl break-words">{memberSinceLabel}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Club Memberships Card */}
-          <div className="bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
+          <div className="min-w-0 h-full bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
             <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-4">
               Club Memberships
             </h2>
@@ -309,18 +347,42 @@ export default function ProfilePage() {
                 {memberships.map(club => (
                   <div 
                     key={club.id}
-                    className="border-4 border-black p-4 bg-brutal-gray hover:bg-white transition-colors"
+                    className="border-4 border-black p-4 bg-white transition-colors"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <button
-                        onClick={() => handleClubClick(club.id)}
-                        className="flex items-center gap-4 flex-1 text-left hover:opacity-80 transition-opacity"
+                        onClick={() => handleClubClick(club.slug || club.id)}
+                        className="flex min-w-0 items-center gap-4 flex-1 text-left hover:opacity-80 transition-opacity"
                         aria-label={`View ${club.name}`}
                       >
-                        <div className="text-4xl" aria-hidden="true">{club.logo}</div>
-                        <div>
-                          <p className="font-black text-lg uppercase">{club.name}</p>
-                          <p className="font-bold text-sm text-gray-600">{club.role}</p>
+                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[1.25rem] border-4 border-black bg-white shadow-[4px_4px_0_0_#000]">
+                          <ImageWithFallback
+                            src={club.logo}
+                            fallbackSrc="/globe.svg"
+                            alt={club.name}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-black text-lg uppercase break-words">{club.name}</p>
+                          <p className="mt-1 font-bold text-sm text-gray-600 line-clamp-2 break-words">
+                            {club.description || "Off-campus club membership in your student network."}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="border-2 border-black bg-black px-2 py-1 text-xs font-black uppercase text-white">
+                              {club.role}
+                            </span>
+                            {club.category ? (
+                              <span className="border-2 border-black bg-brutal-gray px-2 py-1 text-xs font-black uppercase text-black">
+                                {club.category}
+                              </span>
+                            ) : null}
+                            {club.university ? (
+                              <span className="border-2 border-black bg-brutal-gray px-2 py-1 text-xs font-black uppercase text-black">
+                                {club.university}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </button>
                       <button
@@ -344,7 +406,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Activity Stats Section */}
+      {/* Activity Stats Section */}
         <div className="mt-12 bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
           <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-4">
             Activity
@@ -368,7 +430,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* My Posts Section */}
+      {/* My Posts Section */}
         <div className="mt-12 bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
           <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-4">
             My Posts
@@ -394,11 +456,16 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* Edit Profile Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={() => setIsEditModalOpen(false)}
+        >
+          <div>
             <div className="p-8">
               <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4">
                 <h2 className="text-4xl font-black uppercase tracking-tighter">Edit Profile</h2>
@@ -537,13 +604,16 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Leave Club Confirmation Modal */}
       {confirmLeaveClub && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-md w-full">
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-md w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={() => setConfirmLeaveClub(null)}
+        >
+          <div>
             <div className="p-8">
               <h2 className="text-3xl font-black uppercase tracking-tighter mb-4">Leave Club?</h2>
               <p className="font-bold text-lg mb-8">
@@ -565,7 +635,7 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

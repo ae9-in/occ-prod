@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ArrowRight } from "lucide-react";
@@ -9,39 +10,42 @@ import PublicPageGrid from "@/components/PublicPageGrid";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoggedIn } = useUser();
+  const { login, isLoggedIn, isAuthLoading } = useUser();
   const { triggerEntryTransition, isTransitioning } = useTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nextPath, setNextPath] = useState("/feed");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRegisteredMessage, setShowRegisteredMessage] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setNextPath(params.get("next") || "/feed");
+    setShowRegisteredMessage(params.get("registered") === "1");
   }, []);
 
-  // Redirect if already logged in
   useEffect(() => {
-    if (isLoggedIn) {
+    if (!isAuthLoading && isLoggedIn) {
       router.push(nextPath);
     }
-  }, [isLoggedIn, router, nextPath]);
+  }, [isAuthLoading, isLoggedIn, router, nextPath]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isTransitioning) return;
+    if (isTransitioning || isSubmitting) return;
 
-    // TODO: Replace with real API authentication call
-    // On success, call login(userData) with the response from the API
-    const userData = {
-      name: email.split("@")[0] || "User",
-      university: "",
-      email: email,
-    };
+    setError("");
+    setIsSubmitting(true);
 
-    login(userData);
-    triggerEntryTransition(nextPath);
+    try {
+      await login({ email, password });
+      triggerEntryTransition(nextPath);
+    } catch {
+      setError("Invalid email or password.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -52,34 +56,57 @@ export default function LoginPage() {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {showRegisteredMessage ? (
+            <p className="border-l-4 border-brutal-blue pl-3 text-sm font-black uppercase text-brutal-blue">
+              Registration complete. Log in to start exploring OCC.
+            </p>
+          ) : null}
+
           <div>
             <label className="block font-black uppercase text-sm mb-2 tracking-widest">Email Address</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border-4 border-black p-4 font-bold text-lg focus:outline-none focus:bg-brutal-gray transition-colors"
-              placeholder="demo@college.edu"
+              placeholder="admin@occ.local"
             />
           </div>
-          
+
           <div>
             <label className="block font-black uppercase text-sm mb-2 tracking-widest">Password</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border-4 border-black p-4 font-bold text-lg focus:outline-none focus:bg-brutal-gray transition-colors"
-              placeholder="••••••••"
+              placeholder="Enter your password"
             />
           </div>
 
-          <button type="submit" className="w-full bg-black text-white font-black uppercase py-5 text-xl border-4 border-black shadow-[6px_6px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center justify-center gap-3 mt-4">
-            Enter OCC <ArrowRight className="w-6 h-6" />
+          {error ? (
+            <p className="border-l-4 border-red-600 pl-3 text-sm font-black uppercase text-red-600">
+              {error}
+            </p>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-black text-white font-black uppercase py-5 text-xl border-4 border-black shadow-[6px_6px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center justify-center gap-3 mt-4 disabled:opacity-70 disabled:hover:translate-x-0 disabled:hover:translate-y-0"
+          >
+            {isSubmitting ? "Signing In..." : "Enter OCC"} <ArrowRight className="w-6 h-6" />
           </button>
         </form>
+
+        <p className="mt-6 text-sm font-bold text-black/70">
+          New to OCC?{" "}
+          <Link href="/register" className="font-black uppercase text-brutal-blue hover:underline">
+            Create your student account
+          </Link>
+        </p>
       </div>
     </PublicPageGrid>
   );

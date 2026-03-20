@@ -1,24 +1,50 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { type Post } from "@/lib/dataProvider";
 import PostCard from "@/components/PostCard";
 import InteractiveGrid from "@/components/InteractiveGrid";
 import { Zap, LayoutDashboard, Info, X, Plus, Camera, Upload, Trash2 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { usePathname, useRouter } from "next/navigation";
+import type { Post } from "@/lib/dataProvider";
+import { listFeedFromApi, type FeedSettingsInput } from "@/lib/postApi";
+import ModalShell from "@/components/ModalShell";
+
+const FEED_SETTINGS_STORAGE_KEY = "occ-feed-settings";
+
+const defaultFeedSettings: Required<FeedSettingsInput> = {
+  sortBy: "latest",
+  showClubPosts: true,
+  showGeneralPosts: true,
+};
+
+const readStoredFeedSettings = (): Required<FeedSettingsInput> => {
+  if (typeof window === "undefined") {
+    return defaultFeedSettings;
+  }
+
+  try {
+    const raw = localStorage.getItem(FEED_SETTINGS_STORAGE_KEY);
+    if (!raw) return defaultFeedSettings;
+    const parsed = JSON.parse(raw) as FeedSettingsInput;
+    return {
+      sortBy: parsed.sortBy === "popular" ? "popular" : "latest",
+      showClubPosts: parsed.showClubPosts ?? true,
+      showGeneralPosts: parsed.showGeneralPosts ?? true,
+    };
+  } catch {
+    return defaultFeedSettings;
+  }
+};
 
 export default function FeedPage() {
-  const { user, isLoggedIn, posts, addPost, clubs } = useUser();
+  const { isLoggedIn, addPost, clubs } = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showFeedSettings, setShowFeedSettings] = useState(false);
-  const [feedSettings, setFeedSettings] = useState({
-    sortBy: "latest" as "latest" | "popular",
-    showClubPosts: true,
-    showGeneralPosts: true
-  });
+  const [feedSettings, setFeedSettings] = useState<Required<FeedSettingsInput>>(readStoredFeedSettings);
+  const [draftFeedSettings, setDraftFeedSettings] = useState<Required<FeedSettingsInput>>(readStoredFeedSettings);
   const [postForm, setPostForm] = useState({
     content: "",
     clubName: "General"
@@ -26,7 +52,25 @@ export default function FeedPage() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string>("");
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [postSubmitError, setPostSubmitError] = useState<string>("");
+  const [feedPosts, setFeedPosts] = useState<Post[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isApplyingFeedSettings, setIsApplyingFeedSettings] = useState(false);
+  const [feedError, setFeedError] = useState("");
+  const [feedEmptyMessage, setFeedEmptyMessage] = useState("No activity yet. Be the first to post!");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const joinedClubs = clubs.filter((club) => club.isJoined || club.isOwner);
+
+  const doesPostMatchFeedSettings = useCallback((clubId?: string | null) => {
+    const isClubPost = !!clubId && clubId !== "general";
+    if (isClubPost) {
+      return feedSettings.showClubPosts;
+    }
+    return feedSettings.showGeneralPosts;
+  }, [feedSettings.showClubPosts, feedSettings.showGeneralPosts]);
 
   // Close modal on escape key
   useEffect(() => {
@@ -38,14 +82,10 @@ export default function FeedPage() {
 
     if (showCreatePost) {
       document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
     };
   }, [showCreatePost]);
 
@@ -58,6 +98,41 @@ export default function FeedPage() {
     };
   }, [imagePreview]);
 
+  useEffect(() => {
+    let isActive = true;
+
+    const hydrateFeed = async () => {
+      try {
+        setFeedError("");
+        const feed = await listFeedFromApi(1, 10, feedSettings);
+        if (!isActive) return;
+        setFeedPosts(feed.items);
+        setCurrentPage(feed.page);
+        setTotalPages(feed.totalPages);
+        setFeedEmptyMessage(
+          feedSettings.showClubPosts || feedSettings.showGeneralPosts
+            ? "No posts match your current feed settings."
+            : "Choose at least one post type to see your feed.",
+        );
+      } catch {
+        // Keep local feed when the API is unavailable.
+        if (!isActive) return;
+        setFeedError("We couldn't refresh the feed right now.");
+      }
+    };
+
+    hydrateFeed();
+
+    return () => {
+      isActive = false;
+    };
+  }, [feedSettings]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(FEED_SETTINGS_STORAGE_KEY, JSON.stringify(feedSettings));
+  }, [feedSettings]);
+
   const handleCreatePost = useCallback(() => {
     if (!isLoggedIn) {
       router.push(`/login?next=${encodeURIComponent(pathname ?? "/feed")}`);
@@ -67,15 +142,54 @@ export default function FeedPage() {
   }, [isLoggedIn, pathname, router]);
 
   const handleOpenFeedSettings = useCallback(() => {
+    setDraftFeedSettings(feedSettings);
     setShowFeedSettings(true);
-  }, []);
+  }, [feedSettings]);
 
-  // TODO: Replace with API call to load more posts
-  const handleLoadMore = useCallback(() => {}, []);
+  const handleLoadMore = useCallback(async () => {
+    if (isLoadingMore || currentPage >= totalPages) return;
+
+    setIsLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const feed = await listFeedFromApi(nextPage, 10, feedSettings);
+      setFeedPosts((prev) => [...prev, ...feed.items]);
+      setCurrentPage(feed.page);
+      setTotalPages(feed.totalPages);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, feedSettings, isLoadingMore, totalPages]);
 
   const handleCloseFeedSettings = useCallback(() => {
     setShowFeedSettings(false);
   }, []);
+
+  const handleApplyFeedSettings = useCallback(async () => {
+    setIsApplyingFeedSettings(true);
+    try {
+      setFeedSettings(draftFeedSettings);
+      setCurrentPage(1);
+      setShowFeedSettings(false);
+    } finally {
+      setIsApplyingFeedSettings(false);
+    }
+  }, [draftFeedSettings]);
+
+  const handleFeedFilterToggle = useCallback(
+    (key: "showClubPosts" | "showGeneralPosts", value: boolean) => {
+      const nextSettings = { ...draftFeedSettings, [key]: value };
+      if (!nextSettings.showClubPosts && !nextSettings.showGeneralPosts) {
+        setDraftFeedSettings({
+          ...nextSettings,
+          [key === "showClubPosts" ? "showGeneralPosts" : "showClubPosts"]: true,
+        });
+        return;
+      }
+      setDraftFeedSettings(nextSettings);
+    },
+    [draftFeedSettings],
+  );
 
   const handleCloseModal = useCallback(() => {
     setShowCreatePost(false);
@@ -89,6 +203,8 @@ export default function FeedPage() {
     }
     setImagePreview(null);
     setImageError("");
+    setPostSubmitError("");
+    setIsSubmittingPost(false);
   }, [imagePreview]);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,40 +251,46 @@ export default function FeedPage() {
     }
   }, [imagePreview]);
 
-  // TODO: Replace with API call to create post
-  const createPost = useCallback((postData: typeof postForm, image: File | null) => {
-    const selectedClub = clubs.find((club) => club.name === postData.clubName);
-    const newPost: Post = {
-      id: Date.now().toString(),
-      clubId: selectedClub?.id || "general",
-      clubName: postData.clubName,
-      clubLogo: selectedClub?.logo || "/globe.svg",
-      author: user?.name || "Anonymous",
-      content: postData.content,
-      image: image ? URL.createObjectURL(image) : undefined,
-      timestamp: "Just now",
-      likes: 0,
-      comments: []
-    };
-    addPost(newPost);
-  }, [user, addPost, clubs]);
-
-  const handleSubmitPost = useCallback((e: React.FormEvent) => {
+  const handleSubmitPost = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!postForm.content.trim()) {
+
+    if (isSubmittingPost || !postForm.content.trim()) {
       return;
     }
 
-    createPost(postForm, selectedImage);
-    handleCloseModal();
-  }, [postForm, selectedImage, createPost, handleCloseModal]);
+    const selectedClub = joinedClubs.find((club) => club.name === postForm.clubName);
+    setIsSubmittingPost(true);
+    setPostSubmitError("");
 
-  const handleModalBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
+    try {
+      const created = await addPost({
+        content: postForm.content,
+        clubId: selectedClub?.id || null,
+        imageFile: selectedImage,
+      });
+
+      if (!created) {
+        setPostSubmitError("We couldn't create your post right now.");
+        return;
+      }
+
+      if (doesPostMatchFeedSettings(created.clubId)) {
+        setFeedPosts((prev) => {
+          const nextPosts = [created, ...prev];
+          if (feedSettings.sortBy === "popular") {
+            return [...nextPosts].sort((a, b) => b.likes - a.likes);
+          }
+          return nextPosts;
+        });
+      }
+
       handleCloseModal();
+    } catch {
+      setPostSubmitError("We couldn't create your post right now.");
+    } finally {
+      setIsSubmittingPost(false);
     }
-  }, [handleCloseModal]);
+  }, [addPost, doesPostMatchFeedSettings, feedSettings.sortBy, handleCloseModal, isSubmittingPost, joinedClubs, postForm, selectedImage]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 pb-24 pt-12 px-4 md:px-0">
@@ -194,23 +316,31 @@ export default function FeedPage() {
              <Plus className="w-5 h-5" />
              New Post
            </button>
-           <button 
-             onClick={handleOpenFeedSettings}
-             className="bg-transparent text-white px-8 py-4 font-black uppercase text-xs border-2 border-white/20 hover:border-white transition-all flex items-center justify-center gap-2">
+          <button 
+            onClick={handleOpenFeedSettings}
+            className="bg-transparent text-white px-8 py-4 font-black uppercase text-xs border-2 border-white/20 hover:border-white transition-all flex items-center justify-center gap-2">
              <Info className="w-4 h-4"/> Feed Settings
            </button>
+           <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">
+             {feedSettings.sortBy === "popular" ? "Popular first" : "Latest first"} · {feedSettings.showClubPosts ? "Club" : ""}{feedSettings.showClubPosts && feedSettings.showGeneralPosts ? " + " : ""}{feedSettings.showGeneralPosts ? "General" : ""}
+           </p>
         </div>
       </div>
 
       {/* Posts List */}
       <div className="space-y-12 mb-20">
-        {posts.length === 0 ? (
+        {feedError ? (
+          <div className="bg-white border-4 border-black p-8 text-center shadow-[8px_8px_0_0_#000]">
+            <p className="font-black uppercase text-red-600">{feedError}</p>
+          </div>
+        ) : null}
+        {feedPosts.length === 0 ? (
           <div className="bg-white border-4 border-black p-20 text-center shadow-[8px_8px_0_0_#000]">
             <h2 className="text-4xl font-black uppercase mb-4">Radio Silence</h2>
-            <p className="font-bold text-gray-500">No activity yet. Be the first to post!</p>
+            <p className="font-bold text-gray-500">{feedEmptyMessage}</p>
           </div>
         ) : (
-          posts.map(post => (
+          feedPosts.map(post => (
             <PostCard key={post.id} post={post} />
           ))
         )}
@@ -220,19 +350,20 @@ export default function FeedPage() {
       <div className="flex justify-center pt-8">
         <button 
           onClick={handleLoadMore}
+          disabled={isLoadingMore || currentPage >= totalPages}
           className="group flex items-center gap-2 font-black uppercase text-2xl hover:text-brutal-blue transition-all"
         >
-          Load more posts <LayoutDashboard className="w-8 h-8 group-hover:rotate-12 transition-transform" />
+          {currentPage >= totalPages ? "All posts loaded" : isLoadingMore ? "Loading..." : "Load more posts"} <LayoutDashboard className="w-8 h-8 group-hover:rotate-12 transition-transform" />
         </button>
       </div>
 
       {/* Create Post Modal */}
       {showCreatePost && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={handleModalBackdropClick}
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={handleCloseModal}
         >
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div>
             <div className="p-8">
               <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4">
                 <h2 className="text-4xl font-black uppercase tracking-tighter">Create Post</h2>
@@ -256,17 +387,20 @@ export default function FeedPage() {
                     className="w-full border-4 border-black p-4 font-bold text-lg focus:outline-none focus:shadow-[4px_4px_0_0_#1d2cf3]"
                   >
                     <option value="General">General</option>
-                    {clubs.map((club) => (
+                    {joinedClubs.map((club) => (
                       <option key={club.id} value={club.name}>
                         {club.name}
                       </option>
                     ))}
                   </select>
+                  <p className="mt-2 text-sm font-bold text-gray-500">
+                    You can post to General or to clubs you&apos;ve already joined.
+                  </p>
                 </div>
 
                 <div>
                   <label className="font-black uppercase text-sm text-gray-600 tracking-widest mb-2 block">
-                    What's happening?
+                    What&apos;s happening?
                   </label>
                   <textarea
                     value={postForm.content}
@@ -350,9 +484,10 @@ export default function FeedPage() {
                 <div className="flex gap-4 pt-4">
                   <button
                     type="submit"
+                    disabled={isSubmittingPost}
                     className="flex-1 bg-black text-white px-8 py-4 font-black uppercase text-lg border-4 border-black shadow-[6px_6px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"
                   >
-                    Post
+                    {isSubmittingPost ? "Posting..." : "Post"}
                   </button>
                   <button
                     type="button"
@@ -362,18 +497,23 @@ export default function FeedPage() {
                     Cancel
                   </button>
                 </div>
+                {postSubmitError ? (
+                  <p className="text-red-600 font-bold text-sm border-l-4 border-red-600 pl-3">
+                    {postSubmitError}
+                  </p>
+                ) : null}
               </form>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
       {/* Feed Settings Modal */}
       {showFeedSettings && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={(e) => e.target === e.currentTarget && handleCloseFeedSettings()}
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-lg w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={handleCloseFeedSettings}
         >
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-lg w-full">
+          <div>
             <div className="p-8">
               <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4">
                 <h2 className="text-4xl font-black uppercase tracking-tighter">Feed Settings</h2>
@@ -397,8 +537,8 @@ export default function FeedPage() {
                         type="radio"
                         name="sortBy"
                         value="latest"
-                        checked={feedSettings.sortBy === "latest"}
-                        onChange={(e) => setFeedSettings({ ...feedSettings, sortBy: e.target.value as "latest" | "popular" })}
+                        checked={draftFeedSettings.sortBy === "latest"}
+                        onChange={(e) => setDraftFeedSettings({ ...draftFeedSettings, sortBy: e.target.value as "latest" | "popular" })}
                         className="w-5 h-5"
                       />
                       <span className="font-bold text-lg">Latest Posts</span>
@@ -408,8 +548,8 @@ export default function FeedPage() {
                         type="radio"
                         name="sortBy"
                         value="popular"
-                        checked={feedSettings.sortBy === "popular"}
-                        onChange={(e) => setFeedSettings({ ...feedSettings, sortBy: e.target.value as "latest" | "popular" })}
+                        checked={draftFeedSettings.sortBy === "popular"}
+                        onChange={(e) => setDraftFeedSettings({ ...draftFeedSettings, sortBy: e.target.value as "latest" | "popular" })}
                         className="w-5 h-5"
                       />
                       <span className="font-bold text-lg">Popular Posts</span>
@@ -425,8 +565,8 @@ export default function FeedPage() {
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={feedSettings.showClubPosts}
-                        onChange={(e) => setFeedSettings({ ...feedSettings, showClubPosts: e.target.checked })}
+                        checked={draftFeedSettings.showClubPosts}
+                        onChange={(e) => handleFeedFilterToggle("showClubPosts", e.target.checked)}
                         className="w-5 h-5"
                       />
                       <span className="font-bold text-lg">Club Posts</span>
@@ -434,27 +574,31 @@ export default function FeedPage() {
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={feedSettings.showGeneralPosts}
-                        onChange={(e) => setFeedSettings({ ...feedSettings, showGeneralPosts: e.target.checked })}
+                        checked={draftFeedSettings.showGeneralPosts}
+                        onChange={(e) => handleFeedFilterToggle("showGeneralPosts", e.target.checked)}
                         className="w-5 h-5"
                       />
                       <span className="font-bold text-lg">General Posts</span>
                     </label>
                   </div>
+                  <p className="mt-3 text-sm font-bold text-gray-500">
+                    At least one post type stays enabled so your feed never lands in a dead state.
+                  </p>
                 </div>
 
                 <div className="pt-4">
                   <button
-                    onClick={handleCloseFeedSettings}
-                    className="w-full bg-black text-white px-8 py-4 font-black uppercase text-lg border-4 border-black shadow-[6px_6px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"
+                    onClick={handleApplyFeedSettings}
+                    disabled={isApplyingFeedSettings}
+                    className="w-full bg-black text-white px-8 py-4 font-black uppercase text-lg border-4 border-black shadow-[6px_6px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all disabled:opacity-60 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[6px_6px_0_0_#1d2cf3]"
                   >
-                    Apply Settings
+                    {isApplyingFeedSettings ? "Applying..." : "Apply Settings"}
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

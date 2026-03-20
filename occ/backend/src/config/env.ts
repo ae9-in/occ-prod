@@ -22,6 +22,23 @@ const envSchema = z.object({
 
 const parsed = envSchema.parse(process.env);
 
+const looksLikePlaceholderSecret = (value: string) =>
+  /^replace-with/i.test(value) || /^changeme/i.test(value) || /^default/i.test(value);
+
+if (parsed.NODE_ENV === "production") {
+  if (parsed.JWT_ACCESS_SECRET.length < 32 || parsed.JWT_REFRESH_SECRET.length < 32) {
+    throw new Error("JWT secrets must be at least 32 characters long in production");
+  }
+
+  if (looksLikePlaceholderSecret(parsed.JWT_ACCESS_SECRET) || looksLikePlaceholderSecret(parsed.JWT_REFRESH_SECRET)) {
+    throw new Error("JWT secrets must not use placeholder values in production");
+  }
+
+  if (parsed.ADMIN_PASSWORD === "admin123") {
+    throw new Error("ADMIN_PASSWORD must be rotated from the default value before production deployment");
+  }
+}
+
 export const env = {
   port: parsed.PORT,
   nodeEnv: parsed.NODE_ENV,

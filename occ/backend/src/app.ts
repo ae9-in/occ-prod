@@ -36,8 +36,17 @@ app.use(
 );
 app.use(morgan("dev"));
 app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.resolve(process.cwd(), env.uploadDir)));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
+app.use(
+  "/uploads",
+  express.static(path.resolve(process.cwd(), env.uploadDir), {
+    fallthrough: false,
+    setHeaders: (res) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    }
+  })
+);
 
 function healthPayload() {
   return {

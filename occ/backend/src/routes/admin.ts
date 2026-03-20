@@ -31,6 +31,20 @@ const categorySchema = z.object({
   name: z.string().min(2).max(80)
 });
 
+const adminClubCreateSchema = z.object({
+  name: z.string().min(2).max(120),
+  description: z.string().min(2).max(2000).default(""),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]).optional()
+});
+
+const adminClubUpdateSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  description: z.string().min(2).max(2000).optional(),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]).optional(),
+  university: z.string().max(120).nullable().optional(),
+  locationName: z.string().max(180).nullable().optional()
+});
+
 const reportSchema = z.object({
   status: z.enum(["PENDING", "IN_REVIEW", "RESOLVED", "DISMISSED"])
 });
@@ -40,6 +54,30 @@ const moderationSchema = z.object({
 });
 
 router.use(requireAuth, requireAdmin);
+
+async function ensureManageableUserTarget(actor: NonNullable<Express.Request["user"]>, targetUserId: string) {
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    include: { profile: true, settings: true, privacy: true }
+  });
+
+  if (!target) {
+    throw new HttpError(404, "User not found");
+  }
+
+  const actorIsSuperAdmin = actor.role === "SUPER_ADMIN";
+  const targetIsPrivileged = ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(target.role);
+
+  if (!actorIsSuperAdmin && targetIsPrivileged) {
+    throw new HttpError(403, "Only super admins can manage privileged admin accounts");
+  }
+
+  if (target.role === "SUPER_ADMIN" && actor.id !== target.id && !actorIsSuperAdmin) {
+    throw new HttpError(403, "Only super admins can manage other super admins");
+  }
+
+  return target;
+}
 
 async function logAdminAction(adminId: string, actionType: string, targetType: string, targetId: string, metadata: Record<string, unknown> = {}) {
   await prisma.adminActionLog.create({
@@ -108,6 +146,7 @@ router.patch(
   "/admin/users/:id",
   validate(userPatchSchema),
   asyncHandler(async (req, res) => {
+    await ensureManageableUserTarget(req.user!, req.params.id);
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data: req.body,
@@ -122,6 +161,7 @@ router.patch(
   "/admin/users/:id/status",
   validate(userStatusSchema),
   asyncHandler(async (req, res) => {
+    await ensureManageableUserTarget(req.user!, req.params.id);
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data: { status: req.body.status, isActive: req.body.status === "ACTIVE" },
@@ -136,9 +176,16 @@ router.patch(
   "/admin/users/:id/role",
   validate(userRoleSchema),
   asyncHandler(async (req, res) => {
-    if (req.user!.role !== "SUPER_ADMIN" && req.body.role === "SUPER_ADMIN") {
-      throw new HttpError(403, "Only super admins can promote other super admins");
+    const target = await ensureManageableUserTarget(req.user!, req.params.id);
+
+    if (req.user!.role !== "SUPER_ADMIN" && ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(req.body.role)) {
+      throw new HttpError(403, "Only super admins can assign platform-level admin roles");
     }
+
+    if (target.role === "SUPER_ADMIN" && req.user!.role !== "SUPER_ADMIN") {
+      throw new HttpError(403, "Only super admins can modify super admin roles");
+    }
+
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data: { role: req.body.role },
@@ -179,6 +226,7 @@ router.get(
 
 router.post(
   "/admin/clubs",
+  validate(adminClubCreateSchema),
   asyncHandler(async (req, res) => {
     const owner = await prisma.user.findFirst({
       where: { role: { in: ["CLUB_ADMIN", "PLATFORM_ADMIN", "SUPER_ADMIN"] } }
@@ -207,6 +255,7 @@ router.post(
 
 router.patch(
   "/admin/clubs/:id",
+  validate(adminClubUpdateSchema),
   asyncHandler(async (req, res) => {
     const club = await prisma.club.update({
       where: { id: req.params.id },

@@ -1,12 +1,27 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../utils/asyncHandler";
 import { optionalAuth } from "../middleware/auth";
 import { parsePagination } from "../utils/pagination";
 import { successResponse, paginatedResponse } from "../utils/response";
 import { serializeClub, serializePost, serializeUser } from "../utils/serializers";
+import { validate } from "../middleware/validate";
 
 const router = Router();
+
+const exploreQuerySchema = z.object({
+  categorySlug: z.string().max(120).optional(),
+  university: z.string().max(120).optional(),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]).optional(),
+  page: z.coerce.number().optional(),
+  limit: z.coerce.number().optional()
+});
+
+const searchQuerySchema = z.object({
+  q: z.string().max(120).optional(),
+  limit: z.coerce.number().optional()
+});
 
 function buildVisiblePostWhere(user: Express.Request["user"] | undefined) {
   if (user && ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(user.role)) {
@@ -33,6 +48,7 @@ function buildVisiblePostWhere(user: Express.Request["user"] | undefined) {
 router.get(
   "/explore",
   optionalAuth,
+  validate(exploreQuerySchema, "query"),
   asyncHandler(async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
     const where = {
@@ -97,8 +113,10 @@ router.get(
 router.get(
   "/search",
   optionalAuth,
+  validate(searchQuerySchema, "query"),
   asyncHandler(async (req, res) => {
     const query = String(req.query.q || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 20);
     if (!query) {
       return successResponse(res, "Search results fetched successfully", { clubs: [], users: [], posts: [] });
     }
@@ -112,7 +130,7 @@ router.get(
             { university: { contains: query, mode: "insensitive" } }
           ]
         },
-        take: 10,
+        take: limit,
         include: {
           category: true,
           owner: { include: { profile: true, settings: true, privacy: true } },
@@ -128,7 +146,7 @@ router.get(
             { profile: { is: { university: { contains: query, mode: "insensitive" } } } }
           ]
         },
-        take: 10,
+        take: limit,
         include: { profile: true, settings: true, privacy: true }
       }),
       prisma.post.findMany({
@@ -144,7 +162,7 @@ router.get(
             }
           ]
         },
-        take: 10,
+        take: limit,
         orderBy: { createdAt: "desc" },
         include: {
           author: { include: { profile: true, settings: true, privacy: true } },

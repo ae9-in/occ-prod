@@ -1,30 +1,23 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import ClubCard from "@/components/ClubCard";
+import ClubFormModal from "@/components/ClubFormModal";
 import InteractiveGrid from "@/components/InteractiveGrid";
-import { Search, Map, Filter, Globe, X, Plus, Upload, ImagePlus, Trash2 } from "lucide-react";
+import { Search, Map, Filter, Globe, X } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { usePathname, useRouter } from "next/navigation";
+import type { ClubUpsertInput } from "@/lib/clubApi";
 
 export default function ExplorePage() {
   const { clubs, createClub, isLoggedIn } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const clubImageInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [showCreateClub, setShowCreateClub] = useState(false);
-  const [clubForm, setClubForm] = useState({
-    name: "",
-    description: "",
-    category: "Creative",
-    university: "",
-    location: "",
-    logoPreview: "",
-  });
-  const [clubImageError, setClubImageError] = useState("");
+  const [isSubmittingClub, setIsSubmittingClub] = useState(false);
   const [filters, setFilters] = useState({
     category: "all",
     university: "all",
@@ -63,62 +56,23 @@ export default function ExplorePage() {
 
   const closeCreateClub = useCallback(() => {
     setShowCreateClub(false);
-    setClubForm({
-      name: "",
-      description: "",
-      category: "Creative",
-      university: "",
-      location: "",
-      logoPreview: "",
-    });
-    setClubImageError("");
-    if (clubImageInputRef.current) {
-      clubImageInputRef.current.value = "";
-    }
   }, []);
 
-  const handleCreateClub = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateClub = useCallback(async (clubForm: ClubUpsertInput & { logoPreview?: string; bannerPreview?: string }) => {
     if (!clubForm.name.trim() || !clubForm.description.trim()) return;
 
-    const newClubId = createClub(clubForm);
-    closeCreateClub();
+    setIsSubmittingClub(true);
+    try {
+      const newClubId = await createClub(clubForm);
+      closeCreateClub();
 
-    if (newClubId) {
-      router.push(`/clubs/${newClubId}`);
+      if (newClubId) {
+        router.push(`/clubs/${newClubId}`);
+      }
+    } finally {
+      setIsSubmittingClub(false);
     }
-  }, [clubForm, createClub, router, closeCreateClub]);
-
-  const handleClubImagePick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
-    if (!allowedTypes.includes(file.type)) {
-      setClubImageError("Please choose a PNG, JPG, JPEG, WEBP, or GIF image.");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setClubImageError("Club image must be under 5MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setClubForm((prev) => ({ ...prev, logoPreview: reader.result as string }));
-      setClubImageError("");
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  const handleRemoveClubImage = useCallback(() => {
-    setClubForm((prev) => ({ ...prev, logoPreview: "" }));
-    setClubImageError("");
-    if (clubImageInputRef.current) {
-      clubImageInputRef.current.value = "";
-    }
-  }, []);
+  }, [closeCreateClub, createClub, router]);
 
   return (
     <div className="min-h-screen bg-brutal-gray">
@@ -274,144 +228,20 @@ export default function ExplorePage() {
                   <span className="text-5xl font-black leading-none">+</span>
               </div>
               <h3 className="text-2xl font-black uppercase mb-2">Start a new club</h3>
-              <p className="font-bold text-gray-500">Can't find what you're looking for? Build it yourself.</p>
+              <p className="font-bold text-gray-500">Can&apos;t find what you&apos;re looking for? Build it yourself.</p>
             </button>
           </div>
         )}
       </div>
 
-      {showCreateClub && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full">
-            <form onSubmit={handleCreateClub} className="p-8 space-y-6">
-              <div className="flex justify-between items-center border-b-4 border-black pb-4">
-                <h2 className="text-4xl font-black uppercase tracking-tighter">Create Club</h2>
-                <button type="button" onClick={closeCreateClub} className="p-2 hover:bg-brutal-gray transition-colors">
-                  <X className="w-8 h-8" />
-                </button>
-              </div>
-
-              <div>
-                <label className="font-black uppercase text-sm text-gray-600 tracking-widest mb-2 block">Club Name</label>
-                <input
-                  value={clubForm.name}
-                  onChange={(e) => setClubForm({ ...clubForm, name: e.target.value })}
-                  className="w-full border-4 border-black p-4 font-bold text-lg focus:outline-none focus:shadow-[4px_4px_0_0_#1d2cf3]"
-                  placeholder="Creative Builders Guild"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="font-black uppercase text-sm text-gray-600 tracking-widest mb-2 block">Description</label>
-                <textarea
-                  value={clubForm.description}
-                  onChange={(e) => setClubForm({ ...clubForm, description: e.target.value })}
-                  className="w-full border-4 border-black p-4 font-bold text-lg focus:outline-none focus:shadow-[4px_4px_0_0_#1d2cf3] resize-none"
-                  rows={4}
-                  placeholder="What is this club about?"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <select
-                  value={clubForm.category}
-                  onChange={(e) => setClubForm({ ...clubForm, category: e.target.value })}
-                  className="border-4 border-black p-4 font-bold focus:outline-none focus:shadow-[4px_4px_0_0_#1d2cf3]"
-                >
-                  <option value="Creative">Creative</option>
-                  <option value="Academic">Academic</option>
-                  <option value="Sports">Sports</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Social">Social</option>
-                </select>
-                <input
-                  value={clubForm.university}
-                  onChange={(e) => setClubForm({ ...clubForm, university: e.target.value })}
-                  className="border-4 border-black p-4 font-bold focus:outline-none focus:shadow-[4px_4px_0_0_#1d2cf3]"
-                  placeholder="University"
-                />
-                <input
-                  value={clubForm.location}
-                  onChange={(e) => setClubForm({ ...clubForm, location: e.target.value })}
-                  className="border-4 border-black p-4 font-bold focus:outline-none focus:shadow-[4px_4px_0_0_#1d2cf3]"
-                  placeholder="Location"
-                />
-              </div>
-
-              <div>
-                <label className="font-black uppercase text-sm text-gray-600 tracking-widest mb-2 block">
-                  Club Logo
-                </label>
-                <input
-                  ref={clubImageInputRef}
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
-                  onChange={handleClubImagePick}
-                  className="hidden"
-                />
-                {clubForm.logoPreview ? (
-                  <div className="border-4 border-black p-4 bg-brutal-gray">
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                      <img
-                        src={clubForm.logoPreview}
-                        alt="Club logo preview"
-                        className="w-24 h-24 object-cover border-4 border-black bg-white"
-                      />
-                      <div className="flex-1 space-y-3">
-                        <p className="font-bold text-sm text-gray-600">Previewing selected club image.</p>
-                        <div className="flex flex-wrap gap-3">
-                          <button
-                            type="button"
-                            onClick={() => clubImageInputRef.current?.click()}
-                            className="bg-white text-black px-4 py-2 font-black uppercase text-sm border-2 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2"
-                          >
-                            <ImagePlus className="w-4 h-4" />
-                            Replace
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleRemoveClubImage}
-                            className="bg-white text-black px-4 py-2 font-black uppercase text-sm border-2 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => clubImageInputRef.current?.click()}
-                    className="w-full bg-white text-black px-6 py-4 font-black uppercase text-sm border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Upload Club Picture
-                  </button>
-                )}
-                {clubImageError ? (
-                  <p className="mt-3 text-sm font-bold text-red-600">{clubImageError}</p>
-                ) : (
-                  <p className="mt-3 text-sm font-bold text-gray-500">Optional. Add a club image from your device.</p>
-                )}
-              </div>
-
-              <div className="flex gap-4 pt-2">
-                <button type="submit" className="flex-1 bg-black text-white px-8 py-4 font-black uppercase text-lg border-4 border-black shadow-[6px_6px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all flex items-center justify-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Create Club
-                </button>
-                <button type="button" onClick={closeCreateClub} className="flex-1 bg-white text-black px-8 py-4 font-black uppercase text-lg border-4 border-black shadow-[6px_6px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {showCreateClub ? (
+        <ClubFormModal
+          mode="create"
+          isSubmitting={isSubmittingClub}
+          onClose={closeCreateClub}
+          onSubmit={handleCreateClub}
+        />
+      ) : null}
     </div>
   );
 }

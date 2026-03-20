@@ -3,7 +3,9 @@ import { env } from "../config/env";
 
 export function normalizeUrl(filePath?: string | null) {
   if (!filePath) return null;
+  if (/^(blob:|file:)/i.test(filePath)) return null;
   if (/^https?:\/\//i.test(filePath)) return filePath;
+  if (/^[a-zA-Z]:[\\/]/.test(filePath)) return null;
   const normalized = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
   return `${env.appUrl}/${normalized}`;
 }

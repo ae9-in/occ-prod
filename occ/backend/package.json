@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "db:check": "node scripts/healthcheck.js --db-check"
+    "db:check": "node scripts/healthcheck.js --db-check",
+    "loadtest": "node scripts/loadtest.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

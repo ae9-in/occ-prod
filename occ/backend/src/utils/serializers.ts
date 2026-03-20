@@ -21,6 +21,7 @@ type ClubWithRelations = Club & {
   category?: { id: string; name: string; slug: string; createdAt: Date } | null;
   owner?: UserWithRelations | null;
   members?: Array<ClubMember>;
+  joinRequests?: Array<{ userId: string; status: string }>;
   _count?: { members?: number; posts?: number; joinRequests?: number };
 };
 
@@ -90,6 +91,18 @@ export function serializeClub(
 ) {
   if (!club) return null;
   const memberItems = club.members || [];
+  const joinRequests = club.joinRequests || [];
+  const activeMembership = currentUserId ? memberItems.find((member) => member.userId === currentUserId) : null;
+  const isOwner = currentUserId ? club.ownerId === currentUserId : false;
+  const isMember = !!activeMembership || isOwner;
+  const hasPendingJoinRequest = currentUserId
+    ? joinRequests.some((request) => request.userId === currentUserId && request.status === "PENDING")
+    : false;
+  const canJoin = !isOwner && !isMember && club.visibility === "PUBLIC";
+  const canRequestToJoin = !isOwner && !isMember && club.visibility === "PRIVATE" && !hasPendingJoinRequest;
+  const canLeave = isMember && !isOwner;
+  const canEdit = isOwner;
+  const canPost = isMember;
   return {
     id: club.id,
     name: club.name,
@@ -109,8 +122,16 @@ export function serializeClub(
     joinRequestCount: club._count?.joinRequests ?? 0,
     owner: serializeUser(club.owner, userView),
     category: club.category ?? null,
-    isMember: currentUserId ? memberItems.some((member) => member.userId === currentUserId) : false,
-    isOwner: currentUserId ? club.ownerId === currentUserId : false
+    ownerId: club.ownerId,
+    isMember,
+    isOwner,
+    membershipRole: isOwner ? "OWNER" : activeMembership?.membershipRole ?? null,
+    hasPendingJoinRequest,
+    canJoin,
+    canRequestToJoin,
+    canLeave,
+    canEdit,
+    canPost
   };
 }
 

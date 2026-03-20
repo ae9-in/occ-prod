@@ -17,7 +17,7 @@ const updateMeSchema = z.object({
   displayName: z.string().min(2).max(80).optional(),
   bio: z.string().max(280).nullable().optional(),
   university: z.string().max(120).nullable().optional(),
-  phoneNumber: z.string().max(30).nullable().optional(),
+  phoneNumber: z.string().regex(/^[+]?[\d\s\-()]{10,30}$/).max(30).nullable().optional(),
   hobbies: z.string().max(240).nullable().optional(),
   coverUrl: z.string().url().nullable().optional()
 });

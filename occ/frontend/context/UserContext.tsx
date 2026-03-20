@@ -1,42 +1,35 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { type ClubMembership, type Post } from "@/lib/dataProvider";
-import { mockPosts } from "@/lib/mockData/posts";
-import { ClubRecord, mockClubs } from "@/lib/mockData/clubs";
+import { ClubRecord } from "@/lib/mockData/clubs";
+import { createClubOnApi, listClubsFromApi, toClubRecord, type ClubUpsertInput, updateClubOnApi } from "@/lib/clubApi";
+import { joinClubOnApi, leaveClubOnApi } from "@/lib/clubApi";
+import { requestClubJoinOnApi } from "@/lib/clubApi";
+import { createPostOnApi, deletePostOnApi, listFeedFromApi, type PostUpsertInput, updatePostOnApi } from "@/lib/postApi";
+import { fetchCurrentUser, loginWithPassword, type SessionUser } from "@/lib/authApi";
 
-interface User {
-  name: string;
-  university: string;
-  email: string;
-  profilePicture?: string;
-  phoneNumber?: string;
-  hobbies?: string;
-}
+interface User extends SessionUser {}
 
 interface UserContextType {
   user: User | null;
-  login: (userData: User) => void;
+  login: (credentials: { email: string; password: string }) => Promise<User>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
   isLoggedIn: boolean;
+  isAuthLoading: boolean;
   posts: Post[];
   clubs: ClubRecord[];
   memberships: string[];
-  addPost: (post: Post) => void;
-  deletePost: (postId: string) => void;
-  updatePost: (updatedPost: Post) => void;
+  addPost: (postData: PostUpsertInput) => Promise<Post | null>;
+  deletePost: (postId: string) => Promise<void>;
+  updatePost: (updatedPost: Post) => Promise<Post | null>;
   updatePosts: (posts: Post[]) => void;
-  createClub: (clubData: {
-    name: string;
-    description: string;
-    category: string;
-    university?: string;
-    location?: string;
-    logoPreview?: string;
-  }) => string | null;
-  joinClub: (clubId: string) => void;
-  leaveClub: (clubId: string) => void;
+  createClub: (clubData: ClubUpsertInput & { logoPreview?: string; bannerPreview?: string }) => Promise<string | null>;
+  updateClub: (clubId: string, clubData: ClubUpsertInput & { logoPreview?: string; bannerPreview?: string }) => Promise<ClubRecord | null>;
+  joinClub: (clubId: string) => Promise<boolean>;
+  requestToJoinClub: (clubId: string) => Promise<boolean>;
+  leaveClub: (clubId: string) => Promise<boolean>;
   isClubJoined: (clubId: string) => boolean;
   getMembershipItems: () => ClubMembership[];
 }
@@ -45,7 +38,9 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const normalizeAssetSrc = (value?: string | null, fallback?: string) => {
   const trimmed = typeof value === "string" ? value.trim() : "";
-  if (trimmed) return trimmed;
+  if (trimmed && !trimmed.startsWith("blob:") && !trimmed.startsWith("file:") && !/^[a-zA-Z]:[\\/]/.test(trimmed)) {
+    return trimmed;
+  }
   return fallback;
 };
 
@@ -62,9 +57,12 @@ const normalizePostRecord = (value: Post): Post => ({
 
 const normalizeClubRecord = (value: ClubRecord): ClubRecord => ({
   ...value,
+  slug: normalizeAssetSrc(value.slug),
   logo: normalizeAssetSrc(value.logo, "/globe.svg") || "/globe.svg",
-  bannerImage: normalizeAssetSrc(value.bannerImage, "/window.svg") || "/window.svg",
+  bannerImage: normalizeAssetSrc(value.bannerImage, "") || "",
   profileImage: normalizeAssetSrc(value.profileImage, normalizeAssetSrc(value.logo, "/globe.svg")) || "/globe.svg",
+  isJoined: !!value.isJoined,
+  isOwner: !!value.isOwner,
   members: value.members.map((member) => ({
     ...member,
     avatar: normalizeAssetSrc(member.avatar, "/globe.svg") || "/globe.svg",
@@ -75,50 +73,185 @@ const normalizeClubRecord = (value: ClubRecord): ClubRecord => ({
   })),
 });
 
+const readStoredValue = <T,>(key: string, fallback: T, normalize?: (value: T) => T): T => {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  const storedValue = localStorage.getItem(key);
+  if (!storedValue) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue) as T;
+    return normalize ? normalize(parsed) : parsed;
+  } catch {
+    localStorage.removeItem(key);
+    return fallback;
+  }
+};
+
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [posts, setPosts] = useState<Post[]>(() => mockPosts.map(normalizePostRecord));
-  const [clubs, setClubs] = useState<ClubRecord[]>(() => mockClubs.map(normalizeClubRecord));
-  const [memberships, setMemberships] = useState<string[]>([]);
+  const [user, setUser] = useState<User | null>(() =>
+    readStoredValue<User | null>("occ-user", null, (value) => (value ? normalizeUserRecord(value) : null)),
+  );
+  const [posts, setPosts] = useState<Post[]>(() =>
+    readStoredValue<Post[]>("occ-posts", [], (value) => value.map(normalizePostRecord)),
+  );
+  const [clubs, setClubs] = useState<ClubRecord[]>(() =>
+    readStoredValue<ClubRecord[]>("occ-clubs", [], (value) => value.map(normalizeClubRecord)),
+  );
+  const [memberships, setMemberships] = useState<string[]>(() => readStoredValue<string[]>("occ-memberships", []));
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Load user from localStorage on mount
   useEffect(() => {
-    const savedUser = localStorage.getItem("occ-user");
-    const savedMemberships = localStorage.getItem("occ-memberships");
-    const savedClubs = localStorage.getItem("occ-clubs");
-    const savedPosts = localStorage.getItem("occ-posts");
+    if (typeof window === "undefined") return;
 
-    if (savedUser) {
-      try {
-        setUser(normalizeUserRecord(JSON.parse(savedUser)));
-      } catch {
+    const storageVersion = localStorage.getItem("occ-data-version");
+    if (storageVersion === "db-only-v1") return;
+
+    localStorage.removeItem("occ-posts");
+    localStorage.removeItem("occ-clubs");
+    localStorage.removeItem("occ-memberships");
+    localStorage.setItem("occ-data-version", "db-only-v1");
+    setPosts([]);
+    setClubs([]);
+    setMemberships([]);
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const bootstrapUser = async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) {
+        if (!isActive) return;
         localStorage.removeItem("occ-user");
+        setUser(null);
+        setIsAuthLoading(false);
+        return;
       }
+
+      try {
+        const currentUser = normalizeUserRecord(await fetchCurrentUser());
+        if (!isActive) return;
+        setUser(currentUser);
+        localStorage.setItem("occ-user", JSON.stringify(currentUser));
+      } catch {
+        if (!isActive) return;
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("occ-user");
+        setUser(null);
+      } finally {
+        if (isActive) setIsAuthLoading(false);
+      }
+    };
+
+    bootstrapUser();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const mergeClubs = useCallback((incoming: ClubRecord[], preserveOrder = false) => {
+    setClubs((prev) => {
+      const map = new Map<string, ClubRecord>();
+      const previousIds = prev.map((club) => club.id);
+      const incomingIds = incoming.map((club) => club.id);
+
+      for (const club of prev) {
+        const existing = map.get(club.id);
+        map.set(
+          club.id,
+          normalizeClubRecord({
+            ...(existing || club),
+            ...club,
+            members: club.members.length > 0 ? club.members : existing?.members || [],
+            events: club.events.length > 0 ? club.events : existing?.events || [],
+            gallery: club.gallery.length > 0 ? club.gallery : existing?.gallery || [],
+          }),
+        );
+      }
+
+      for (const club of incoming) {
+        const existing = map.get(club.id);
+        map.set(
+          club.id,
+          normalizeClubRecord({
+            ...(existing || club),
+            ...club,
+            members: club.members.length > 0 ? club.members : existing?.members || [],
+            events: club.events.length > 0 ? club.events : existing?.events || [],
+            gallery: club.gallery.length > 0 ? club.gallery : existing?.gallery || [],
+          }),
+        );
+      }
+
+      const orderedIds = preserveOrder
+        ? [...previousIds, ...incomingIds.filter((id) => !previousIds.includes(id))]
+        : [...incomingIds, ...previousIds.filter((id) => !incomingIds.includes(id))];
+
+      return orderedIds.map((id) => map.get(id)!).filter(Boolean);
+    });
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadRemoteClubs = async () => {
+      try {
+        const apiClubs = await listClubsFromApi();
+        if (!isActive) return;
+        if (apiClubs.length === 0) {
+          setClubs([]);
+          setMemberships([]);
+          return;
+        }
+
+        const mappedClubs = apiClubs.map((club) => toClubRecord(club));
+        mergeClubs(mappedClubs);
+        setMemberships(
+          mappedClubs
+            .filter((club) => club.isJoined || club.isOwner)
+            .map((club) => club.id),
+        );
+      } catch {
+        // Keep local data when the API is unavailable.
+      }
+    };
+
+    if (!user) {
+      setMemberships([]);
     }
 
-    if (savedMemberships) {
-      try {
-        setMemberships(JSON.parse(savedMemberships));
-      } catch {
-        localStorage.removeItem("occ-memberships");
-      }
-    }
+    loadRemoteClubs();
 
-    if (savedClubs) {
-      try {
-        setClubs(JSON.parse(savedClubs).map(normalizeClubRecord));
-      } catch {
-        localStorage.removeItem("occ-clubs");
-      }
-    }
+    return () => {
+      isActive = false;
+    };
+  }, [mergeClubs, user]);
 
-    if (savedPosts) {
+  useEffect(() => {
+    let isActive = true;
+
+    const loadRemotePosts = async () => {
       try {
-        setPosts(JSON.parse(savedPosts).map(normalizePostRecord));
+        const feed = await listFeedFromApi(1, 20);
+        if (!isActive) return;
+        setPosts(feed.items.map(normalizePostRecord));
       } catch {
-        localStorage.removeItem("occ-posts");
+        // Keep local data when the API is unavailable.
       }
-    }
+    };
+
+    loadRemotePosts();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -133,15 +266,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("occ-memberships", JSON.stringify(memberships));
   }, [memberships]);
 
-  // TODO: Replace with real auth API call
-  const login = (userData: User) => {
-    const nextUser = normalizeUserRecord(userData);
+  const login = async ({ email, password }: { email: string; password: string }) => {
+    const session = await loginWithPassword(email, password);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("token", session.accessToken);
+      localStorage.setItem("refreshToken", session.refreshToken);
+    }
+    const nextUser = normalizeUserRecord(session.user);
     setUser(nextUser);
     localStorage.setItem("occ-user", JSON.stringify(nextUser));
+    return nextUser;
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("occ-user");
   };
 
@@ -153,124 +293,219 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // TODO: Replace with API call to create post
-  const addPost = (post: Post) => {
-    setPosts(prev => [normalizePostRecord(post), ...prev]);
+  const addPost = async (postData: PostUpsertInput) => {
+    try {
+      const created = await createPostOnApi(postData);
+      setPosts(prev => [normalizePostRecord(created), ...prev]);
+      return created;
+    } catch {
+      return null;
+    }
   };
 
-  // TODO: Replace with API call to delete post
-  const deletePost = (postId: string) => {
+  const deletePost = async (postId: string) => {
+    await deletePostOnApi(postId);
     setPosts(prev => prev.filter(p => p.id !== postId));
   };
 
-  // TODO: Replace with API call to update post
-  const updatePost = (updatedPost: Post) => {
-    setPosts(prev => prev.map(p => p.id === updatedPost.id ? normalizePostRecord(updatedPost) : p));
+  const updatePost = async (updatedPost: Post) => {
+    try {
+      const updated = await updatePostOnApi(updatedPost.id, {
+        content: updatedPost.content,
+        clubId: updatedPost.clubId === "general" ? null : updatedPost.clubId,
+      });
+      setPosts(prev => prev.map(p => p.id === updated.id ? normalizePostRecord(updated) : p));
+      return updated;
+    } catch {
+      return null;
+    }
   };
 
   const updatePosts = (newPosts: Post[]) => {
     setPosts(newPosts.map(normalizePostRecord));
   };
 
-  const createClub = (clubData: {
-    name: string;
-    description: string;
-    category: string;
-    university?: string;
-    location?: string;
-    logoPreview?: string;
-  }) => {
+  const createClub = async (clubData: ClubUpsertInput & { logoPreview?: string; bannerPreview?: string }) => {
     if (!user) return null;
 
-    const clubId = `club-${Date.now()}`;
-    const logoPreview = clubData.logoPreview || "/globe.svg";
-    const newClub: ClubRecord = {
-      id: clubId,
-      name: clubData.name.trim(),
-      description: clubData.description.trim(),
-      tagline: `${clubData.name.trim()} starts here.`,
-      fullDescription: clubData.description.trim(),
-      logo: logoPreview,
-      bannerImage: "/window.svg",
-      profileImage: logoPreview,
-      category: clubData.category,
-      location: clubData.location?.trim() || "Campus Hub",
-      university: clubData.university?.trim() || user.university || "Independent",
-      membersCount: 1,
-      eventsCount: 0,
-      members: [
-        {
-          id: `member-${Date.now()}`,
-          name: user.name,
-          role: "Founder",
-          avatar: user.profilePicture || "/globe.svg",
-        },
-      ],
-      events: [],
-      gallery: [],
-    };
+    try {
+      const createdClub = await createClubOnApi(clubData);
+      const normalizedClub = normalizeClubRecord({
+        ...createdClub,
+        membersCount: Math.max(createdClub.membersCount, 1),
+        members: createdClub.members.length > 0
+          ? createdClub.members
+          : [
+              {
+                id: `member-${Date.now()}`,
+                name: user.name,
+                role: "Founder",
+                avatar: user.profilePicture || "/globe.svg",
+              },
+            ],
+        university: createdClub.university || user.university || "Independent",
+        isJoined: true,
+        isOwner: true,
+        membershipRole: "OWNER",
+        canEdit: true,
+        canLeave: false,
+        canJoin: false,
+        canRequestToJoin: false,
+        hasPendingJoinRequest: false,
+        canPost: true,
+      });
 
-    setClubs(prev => [normalizeClubRecord(newClub), ...prev]);
-    setMemberships(prev => (prev.includes(clubId) ? prev : [...prev, clubId]));
-    return clubId;
+      mergeClubs([normalizedClub]);
+      setMemberships(prev => (prev.includes(normalizedClub.id) ? prev : [...prev, normalizedClub.id]));
+      return normalizedClub.slug || normalizedClub.id;
+    } catch {
+      return null;
+    }
   };
 
-  const joinClub = (clubId: string) => {
-    if (!user) return;
+  const updateClub = async (
+    clubId: string,
+    clubData: ClubUpsertInput & { logoPreview?: string; bannerPreview?: string },
+  ) => {
+    const existingClub = clubs.find((club) => club.id === clubId || club.slug === clubId);
+    if (!existingClub) return null;
 
-    setMemberships(prev => (prev.includes(clubId) ? prev : [...prev, clubId]));
-    setClubs(prev =>
-      prev.map(club => {
-        if (club.id !== clubId) return club;
-        if (club.members.some(member => member.name === user.name)) {
-          return club;
-        }
-
-        return normalizeClubRecord({
-          ...club,
-          membersCount: club.membersCount + 1,
-          members: [
-            ...club.members,
-            {
-              id: `member-${clubId}-${Date.now()}`,
-              name: user.name,
-              role: "Member",
-              avatar: user.profilePicture || "/globe.svg",
-            },
-          ],
-        });
-      }),
-    );
+    try {
+      const updatedClub = await updateClubOnApi(existingClub.id, clubData);
+      const normalizedClub = normalizeClubRecord({
+        ...existingClub,
+        ...updatedClub,
+        category: updatedClub.category || clubData.category || existingClub.category,
+        members: existingClub.members,
+        events: existingClub.events,
+        gallery: existingClub.gallery,
+        isJoined: updatedClub.isJoined ?? existingClub.isJoined,
+        isOwner: existingClub.isOwner || updatedClub.isOwner,
+      });
+      mergeClubs([normalizedClub], true);
+      return normalizedClub;
+    } catch {
+      return null;
+    }
   };
 
-  const leaveClub = (clubId: string) => {
-    if (!user) return;
+  const joinClub = async (clubId: string) => {
+    if (!user) return false;
 
-    setMemberships(prev => prev.filter(id => id !== clubId));
-    setClubs(prev =>
-      prev.map(club => {
-        if (club.id !== clubId) return club;
-        const nextMembers = club.members.filter(member => member.name !== user.name);
+    try {
+      await joinClubOnApi(clubId);
+      setMemberships((prev) => (prev.includes(clubId) ? prev : [...prev, clubId]));
+      setClubs((prev) =>
+        prev.map((club) => {
+          if (club.id !== clubId) return club;
+          if (club.members.some((member) => member.name === user.name)) {
+            return normalizeClubRecord({
+              ...club,
+              isJoined: true,
+              hasPendingJoinRequest: false,
+              canJoin: false,
+              canRequestToJoin: false,
+              canLeave: !club.isOwner,
+              canPost: true,
+            });
+          }
 
-        return normalizeClubRecord({
-          ...club,
-          membersCount: Math.max(0, nextMembers.length),
-          members: nextMembers,
-        });
-      }),
-    );
+          return normalizeClubRecord({
+            ...club,
+            isJoined: true,
+            hasPendingJoinRequest: false,
+            canJoin: false,
+            canRequestToJoin: false,
+            canLeave: !club.isOwner,
+            canPost: true,
+            membersCount: club.membersCount + 1,
+            members: [
+              ...club.members,
+              {
+                id: `member-${clubId}-${Date.now()}`,
+                name: user.name,
+                role: "Member",
+                avatar: user.profilePicture || "/globe.svg",
+              },
+            ],
+          });
+        }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const isClubJoined = (clubId: string) => memberships.includes(clubId);
+  const requestToJoinClub = async (clubId: string) => {
+    if (!user) return false;
+
+    try {
+      await requestClubJoinOnApi(clubId);
+      setClubs((prev) =>
+        prev.map((club) =>
+          club.id === clubId
+            ? normalizeClubRecord({
+                ...club,
+                hasPendingJoinRequest: true,
+                canJoin: false,
+                canRequestToJoin: false,
+                canPost: false,
+              })
+            : club,
+        ),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const leaveClub = async (clubId: string) => {
+    if (!user) return false;
+
+    try {
+      await leaveClubOnApi(clubId, user.id);
+      setMemberships((prev) => prev.filter((id) => id !== clubId));
+      setClubs((prev) =>
+        prev.map((club) => {
+          if (club.id !== clubId) return club;
+          const nextMembers = club.members.filter((member) => member.name !== user.name);
+
+          return normalizeClubRecord({
+            ...club,
+            isJoined: false,
+            hasPendingJoinRequest: false,
+            canJoin: club.visibility === "PUBLIC",
+            canRequestToJoin: club.visibility === "PRIVATE",
+            canLeave: false,
+            canPost: false,
+            membersCount: Math.max(0, nextMembers.length),
+            members: nextMembers,
+          });
+        }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const isClubJoined = (clubId: string) =>
+    memberships.includes(clubId) || clubs.some((club) => club.id === clubId && (club.isJoined || club.isOwner));
 
   const getMembershipItems = () =>
     clubs
       .filter(club => memberships.includes(club.id))
       .map(club => ({
         id: club.id,
+        slug: club.slug || club.id,
         name: club.name,
         role: "Member",
         logo: club.logo,
+        description: club.description,
+        university: club.university,
+        category: club.category,
       }));
 
   return (
@@ -280,6 +515,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       logout,
       updateUser,
       isLoggedIn: !!user,
+      isAuthLoading,
       posts,
       clubs,
       memberships,
@@ -288,7 +524,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       updatePost,
       updatePosts,
       createClub,
+      updateClub,
       joinClub,
+      requestToJoinClub,
       leaveClub,
       isClubJoined,
       getMembershipItems,

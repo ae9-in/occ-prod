@@ -5,6 +5,8 @@ import { MessageSquare, ArrowBigUp, Share2, Expand, MoreHorizontal, Edit, Trash2
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
+import ImageWithFallback from "@/components/ImageWithFallback";
+import ModalShell from "@/components/ModalShell";
 
 export default function PostCard({ post }: { post: Post }) {
   const { user, deletePost, updatePost, isLoggedIn } = useUser();
@@ -187,7 +189,7 @@ export default function PostCard({ post }: { post: Post }) {
   }, [reportReason, isLoggedIn, redirectToLogin]);
 
   return (
-    <div className="bg-white border-4 border-black p-6 md:p-8 flex flex-col gap-4 shadow-[6px_6px_0_0_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0_0_#1d2cf3] transition-all group overflow-hidden">
+    <div className="relative isolate bg-white border-4 border-black p-6 md:p-8 flex flex-col gap-4 shadow-[6px_6px_0_0_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0_0_#1d2cf3] transition-all group overflow-hidden">
       {/* Post Header */}
       <div className="flex justify-between items-center mb-2">
         <button
@@ -201,7 +203,9 @@ export default function PostCard({ post }: { post: Post }) {
           }}
           className="flex items-center gap-3 hover:translate-x-1 transition-transform text-left"
         >
-          <img src={safeClubLogo} alt={post.clubName} className="w-10 h-10 border-2 border-black object-cover" />
+          <div className="w-10 h-10 overflow-hidden rounded-xl border-2 border-black bg-white">
+            <ImageWithFallback src={safeClubLogo} fallbackSrc="/globe.svg" alt={post.clubName} className="w-full h-full object-cover" />
+          </div>
           <div className="flex flex-col">
             <span className="bg-black text-white text-xs font-black uppercase px-2 py-1 shadow-[2px_2px_0_0_#1d2cf3] inline-block mb-1">{post.clubName}</span>
             <span className="text-[10px] font-black uppercase text-gray-400">posted by {post.author}</span>
@@ -265,13 +269,13 @@ export default function PostCard({ post }: { post: Post }) {
           }
           router.push(`/post/${post.id}`);
         }}
-        className="block w-full text-left hover:opacity-80 transition-opacity"
+        className="block w-full bg-white text-left transition-opacity hover:opacity-80 focus:outline-none focus:bg-white active:bg-white"
       >
-        <div className="space-y-4">
+        <div className="space-y-4 bg-white">
           <p className="text-xl md:text-2xl font-black uppercase leading-tight text-black border-l-4 border-brutal-blue pl-4 py-1">{post.content}</p>
           {safePostImage && (
-            <div className="relative group/image overflow-hidden border-4 border-black shadow-[4px_4px_0_0_#000]">
-              <img src={safePostImage} alt="Post visual" className="w-full h-auto max-h-[400px] object-cover hover:scale-105 transition-transform duration-500" />
+            <div className="relative group/image overflow-hidden border-4 border-black bg-white shadow-[4px_4px_0_0_#000]">
+              <ImageWithFallback src={safePostImage} fallbackSrc="/window.svg" alt="Post visual" className="w-full h-auto max-h-[400px] object-cover hover:scale-105 transition-transform duration-500" />
               <div className="absolute top-4 right-4 bg-white border-2 border-black p-2 shadow-[2px_2px_0_0_#000] opacity-0 group-hover/image:opacity-100 transition-opacity cursor-pointer">
                 <Expand className="w-5 h-5 text-black" />
               </div>
@@ -281,7 +285,7 @@ export default function PostCard({ post }: { post: Post }) {
       </button>
       
       {/* Interaction Buttons */}
-      <div className="flex items-center gap-4 md:gap-8 pt-6 mt-2 border-t-2 border-dashed border-gray-300">
+      <div className="flex items-center gap-4 md:gap-8 bg-white pt-6 mt-2 border-t-2 border-dashed border-gray-300">
         <button 
           onClick={toggleLike}
           className={`flex items-center gap-2 font-black uppercase text-sm px-4 py-2 border-2 border-black transition-all shadow-[2px_2px_0_0_#000] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] ${liked ? 'bg-brutal-blue text-white' : 'bg-white text-black'}`}
@@ -312,7 +316,7 @@ export default function PostCard({ post }: { post: Post }) {
 
       {/* Demo Comments Section */}
       {showComments && (
-        <div className="mt-4 pt-6 bg-gray-50 border-t-4 border-black -mx-6 -mb-6 md:-mx-8 md:-mb-8 p-6 md:p-8 space-y-4 animate-in slide-in-from-top-4 duration-300">
+        <div className="mt-4 pt-6 bg-white border-t-4 border-black -mx-6 -mb-6 md:-mx-8 md:-mb-8 p-6 md:p-8 space-y-4 animate-in slide-in-from-top-4 duration-300">
           <h4 className="text-sm font-black uppercase text-gray-500 mb-2">Discussion</h4>
           {comments.length === 0 ? (
             <p className="font-bold text-gray-400 italic">No comments yet. Start the conversation!</p>
@@ -346,8 +350,11 @@ export default function PostCard({ post }: { post: Post }) {
 
       {/* Edit Post Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-2xl w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={() => setShowEditModal(false)}
+        >
+          <div>
             <div className="p-8">
               <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4">
                 <h2 className="text-4xl font-black uppercase tracking-tighter">Edit Post</h2>
@@ -391,13 +398,16 @@ export default function PostCard({ post }: { post: Post }) {
               </div>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-md w-full">
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-md w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={() => setShowDeleteConfirm(false)}
+        >
+          <div>
             <div className="p-8">
               <h2 className="text-3xl font-black uppercase tracking-tighter mb-4">Delete Post?</h2>
               <p className="font-bold text-lg mb-8">
@@ -419,13 +429,16 @@ export default function PostCard({ post }: { post: Post }) {
               </div>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Report Post Modal */}
       {showReportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-md w-full">
+        <ModalShell
+          className="bg-white border-8 border-black shadow-[16px_16px_0_0_#1d2cf3] max-w-md w-full max-h-[calc(100vh-3rem)] overflow-y-auto"
+          onClose={() => setShowReportModal(false)}
+        >
+          <div>
             <div className="p-8">
               <div className="flex justify-between items-center mb-6 border-b-4 border-black pb-4">
                 <h2 className="text-3xl font-black uppercase tracking-tighter">Report Post</h2>
@@ -474,7 +487,7 @@ export default function PostCard({ post }: { post: Post }) {
               </div>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

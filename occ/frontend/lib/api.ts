@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -6,13 +6,21 @@ const API_URL = API_BASE;
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 api.interceptors.request.use(
   (config) => {
+    const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+    const headers = AxiosHeaders.from(config.headers);
+
+    if (isFormData) {
+      headers.delete('Content-Type');
+    } else if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+
+    config.headers = headers;
+
     // Add token if exists
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');

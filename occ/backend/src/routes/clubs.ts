@@ -16,16 +16,46 @@ import { getClubAccess } from "../middleware/requireRole";
 
 const router = Router();
 
+const emptyStringToUndefined = (value: unknown) => {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+  return value;
+};
+
+const emptyStringToNull = (value: unknown) => {
+  if (value === null || value === "null") {
+    return null;
+  }
+  if (typeof value === "string" && value.trim() === "") {
+    return null;
+  }
+  return value;
+};
+
+const stringToBoolean = (value: unknown) => {
+  if (value === true || value === false) {
+    return value;
+  }
+  if (typeof value === "string") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+  }
+  return value;
+};
+
 const clubSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().min(10).max(2000),
-  categoryId: z.string().cuid().nullable().optional(),
-  university: z.string().max(120).optional(),
-  locationName: z.string().max(180).optional(),
-  latitude: z.coerce.number().nullable().optional(),
-  longitude: z.coerce.number().nullable().optional(),
-  bannerUrl: z.string().url().nullable().optional(),
-  visibility: z.enum(["PUBLIC", "PRIVATE"]).optional()
+  categoryId: z.preprocess(emptyStringToUndefined, z.string().cuid().nullable().optional()),
+  university: z.preprocess(emptyStringToUndefined, z.string().max(120).optional()),
+  locationName: z.preprocess(emptyStringToUndefined, z.string().max(180).optional()),
+  latitude: z.preprocess(emptyStringToUndefined, z.coerce.number().nullable().optional()),
+  longitude: z.preprocess(emptyStringToUndefined, z.coerce.number().nullable().optional()),
+  bannerUrl: z.preprocess(emptyStringToNull, z.string().url().nullable().optional()),
+  visibility: z.preprocess(emptyStringToUndefined, z.enum(["PUBLIC", "PRIVATE"]).optional()),
+  removeLogo: z.preprocess(stringToBoolean, z.boolean().optional()),
+  removeBanner: z.preprocess(stringToBoolean, z.boolean().optional())
 });
 
 const clubUpdateSchema = clubSchema.partial();
@@ -44,18 +74,35 @@ const clubListQuerySchema = z.object({
   limit: z.coerce.number().optional()
 });
 
-async function ensureClubManager(clubId: string, user: NonNullable<Express.Request["user"]>) {
+async function ensureClubOwner(clubId: string, user: NonNullable<Express.Request["user"]>) {
   const access = await getClubAccess(clubId, user.id);
   const isPlatformAdmin = ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(user.role);
-  if (!access.isOwner && !access.isClubAdmin && !isPlatformAdmin) {
-    throw new HttpError(403, "You do not have permission to manage this club");
+  if (!access.isOwner && !isPlatformAdmin) {
+    throw new HttpError(403, "Only the club owner can manage this club");
   }
   return access;
 }
 
-async function getClubVisibilityContext(clubId: string, user: Express.Request["user"] | undefined) {
+async function findClubByIdOrSlug(identifier: string) {
+  return prisma.club.findFirst({
+    where: {
+      OR: [{ id: identifier }, { slug: identifier }]
+    }
+  });
+}
+
+async function getResolvedClubId(identifier: string) {
+  const club = await findClubByIdOrSlug(identifier);
+  if (!club) {
+    throw new HttpError(404, "Club not found");
+  }
+  return club.id;
+}
+
+async function getClubVisibilityContext(clubIdentifier: string, user: Express.Request["user"] | undefined) {
+  const resolvedClubId = await getResolvedClubId(clubIdentifier);
   const club = await prisma.club.findUnique({
-    where: { id: clubId },
+    where: { id: resolvedClubId },
     include: user
       ? {
           members: {
@@ -107,6 +154,7 @@ router.get(
           category: true,
           owner: { include: { profile: true, settings: true, privacy: true } },
           members: req.user ? { where: { userId: req.user.id } } : undefined,
+          joinRequests: req.user ? { where: { userId: req.user.id } } : undefined,
           _count: { select: { members: true, posts: true, joinRequests: true } }
         }
       })
@@ -162,6 +210,7 @@ router.post(
         category: true,
         owner: { include: { profile: true, settings: true, privacy: true } },
         members: { where: { userId: req.user!.id } },
+        joinRequests: { where: { userId: req.user!.id } },
         _count: { select: { members: true, posts: true, joinRequests: true } }
       }
     });
@@ -186,6 +235,7 @@ router.get(
         category: true,
         owner: { include: { profile: true, settings: true, privacy: true } },
         members: req.user ? { where: { userId: req.user.id } } : undefined,
+        joinRequests: req.user ? { where: { userId: req.user.id } } : undefined,
         _count: { select: { members: true, posts: true, joinRequests: true } }
       }
     });
@@ -204,10 +254,11 @@ router.patch(
   ]),
   validate(clubUpdateSchema),
   asyncHandler(async (req, res) => {
-    await ensureClubManager(req.params.id, req.user!);
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    await ensureClubOwner(resolvedClubId, req.user!);
     const files = req.files as Record<string, Express.Multer.File[]> | undefined;
     const club = await prisma.club.update({
-      where: { id: req.params.id },
+      where: { id: resolvedClubId },
       data: {
         name: req.body.name,
         description: req.body.description,
@@ -217,13 +268,16 @@ router.patch(
         latitude: req.body.latitude,
         longitude: req.body.longitude,
         visibility: req.body.visibility,
-        logoUrl: fileToRelativeUrl(files?.logo?.[0]) || undefined,
-        bannerUrl: fileToRelativeUrl(files?.banner?.[0]) || req.body.bannerUrl
+        logoUrl: req.body.removeLogo ? null : fileToRelativeUrl(files?.logo?.[0]) || undefined,
+        bannerUrl: req.body.removeBanner
+          ? null
+          : fileToRelativeUrl(files?.banner?.[0]) || req.body.bannerUrl || undefined
       },
       include: {
         category: true,
         owner: { include: { profile: true, settings: true, privacy: true } },
         members: { where: { userId: req.user!.id } },
+        joinRequests: { where: { userId: req.user!.id } },
         _count: { select: { members: true, posts: true, joinRequests: true } }
       }
     });
@@ -236,8 +290,9 @@ router.delete(
   "/clubs/:id",
   requireAuth,
   asyncHandler(async (req, res) => {
-    await ensureClubManager(req.params.id, req.user!);
-    await prisma.club.delete({ where: { id: req.params.id } });
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    await ensureClubOwner(resolvedClubId, req.user!);
+    await prisma.club.delete({ where: { id: resolvedClubId } });
     return successResponse(res, "Club deleted successfully", {});
   })
 );
@@ -246,17 +301,21 @@ router.post(
   "/clubs/:id/join",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const club = await prisma.club.findUnique({ where: { id: req.params.id } });
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    const club = await prisma.club.findUnique({ where: { id: resolvedClubId } });
     if (!club) throw new HttpError(404, "Club not found");
     if (club.visibility !== "PUBLIC") throw new HttpError(400, "This club requires an approval request");
+    if (club.ownerId === req.user!.id) {
+      throw new HttpError(400, "You already own this club");
+    }
 
     const membership = await prisma.clubMember.upsert({
-      where: { clubId_userId: { clubId: req.params.id, userId: req.user!.id } },
-      create: { clubId: req.params.id, userId: req.user!.id, membershipRole: "MEMBER" },
+      where: { clubId_userId: { clubId: resolvedClubId, userId: req.user!.id } },
+      create: { clubId: resolvedClubId, userId: req.user!.id, membershipRole: "MEMBER" },
       update: {}
     });
 
-    await prisma.clubJoinRequest.deleteMany({ where: { clubId: req.params.id, userId: req.user!.id } });
+    await prisma.clubJoinRequest.deleteMany({ where: { clubId: resolvedClubId, userId: req.user!.id } });
     return successResponse(res, "Club joined successfully", { membership });
   })
 );
@@ -265,13 +324,17 @@ router.post(
   "/clubs/:id/request",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const club = await prisma.club.findUnique({ where: { id: req.params.id } });
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    const club = await prisma.club.findUnique({ where: { id: resolvedClubId } });
     if (!club) throw new HttpError(404, "Club not found");
     if (club.visibility === "PUBLIC") throw new HttpError(400, "Public clubs can be joined directly");
+    if (club.ownerId === req.user!.id) {
+      throw new HttpError(400, "You already own this club");
+    }
 
     const joinRequest = await prisma.clubJoinRequest.upsert({
-      where: { clubId_userId: { clubId: req.params.id, userId: req.user!.id } },
-      create: { clubId: req.params.id, userId: req.user!.id, status: "PENDING" },
+      where: { clubId_userId: { clubId: resolvedClubId, userId: req.user!.id } },
+      create: { clubId: resolvedClubId, userId: req.user!.id, status: "PENDING" },
       update: { status: "PENDING" }
     });
 
@@ -283,15 +346,16 @@ router.get(
   "/clubs/:id/members",
   optionalAuth,
   asyncHandler(async (req, res) => {
+    const resolvedClubId = await getResolvedClubId(req.params.id);
     const members = await prisma.clubMember.findMany({
-      where: { clubId: req.params.id },
+      where: { clubId: resolvedClubId },
       include: {
         user: { include: { profile: true, settings: true, privacy: true } }
       },
       orderBy: { joinedAt: "asc" }
     });
 
-    const { club, isAdmin, isOwner, isMember } = await getClubVisibilityContext(req.params.id, req.user);
+    const { club, isAdmin, isOwner, isMember } = await getClubVisibilityContext(resolvedClubId, req.user);
     if (club.visibility === "PRIVATE" && !isAdmin && !isOwner && !isMember) {
       throw new HttpError(403, "You do not have permission to view this member list");
     }
@@ -313,10 +377,11 @@ router.patch(
   requireAuth,
   validate(memberUpdateSchema),
   asyncHandler(async (req, res) => {
-    await ensureClubManager(req.params.id, req.user!);
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    await ensureClubOwner(resolvedClubId, req.user!);
     const member = await prisma.clubMember.findFirst({
       where: {
-        clubId: req.params.id,
+        clubId: resolvedClubId,
         OR: [{ id: req.params.memberId }, { userId: req.params.memberId }]
       }
     });
@@ -336,13 +401,19 @@ router.delete(
   requireAuth,
   asyncHandler(async (req, res) => {
     const isSelf = req.params.memberId === req.user!.id;
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    const club = await prisma.club.findUnique({ where: { id: resolvedClubId } });
+    if (!club) throw new HttpError(404, "Club not found");
+    if (club.ownerId === req.user!.id && isSelf) {
+      throw new HttpError(400, "Club owners cannot leave their own club");
+    }
     if (!isSelf) {
-      await ensureClubManager(req.params.id, req.user!);
+      await ensureClubOwner(resolvedClubId, req.user!);
     }
 
     const member = await prisma.clubMember.findFirst({
       where: {
-        clubId: req.params.id,
+        clubId: resolvedClubId,
         OR: [{ id: req.params.memberId }, { userId: req.params.memberId }]
       }
     });
@@ -356,14 +427,15 @@ router.get(
   "/clubs/:id/posts",
   optionalAuth,
   asyncHandler(async (req, res) => {
-    const { club, isAdmin, isOwner, isMember } = await getClubVisibilityContext(req.params.id, req.user);
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    const { club, isAdmin, isOwner, isMember } = await getClubVisibilityContext(resolvedClubId, req.user);
     if (club.visibility === "PRIVATE" && !isAdmin && !isOwner && !isMember) {
       throw new HttpError(403, "You do not have permission to view this club's posts");
     }
 
     const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
     const where = {
-      clubId: req.params.id,
+      clubId: resolvedClubId,
       deletedAt: null,
       moderationStatus: "PUBLISHED" as const,
       ...(!isAdmin && !isOwner && !isMember ? { visibility: "PUBLIC" as const } : {})
@@ -407,9 +479,10 @@ router.get(
   "/clubs/:id/requests",
   requireAuth,
   asyncHandler(async (req, res) => {
-    await ensureClubManager(req.params.id, req.user!);
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    await ensureClubOwner(resolvedClubId, req.user!);
     const requests = await prisma.clubJoinRequest.findMany({
-      where: { clubId: req.params.id },
+      where: { clubId: resolvedClubId },
       include: {
         user: { include: { profile: true, settings: true, privacy: true } }
       },
@@ -433,9 +506,10 @@ router.patch(
   requireAuth,
   validate(joinRequestActionSchema),
   asyncHandler(async (req, res) => {
-    await ensureClubManager(req.params.id, req.user!);
+    const resolvedClubId = await getResolvedClubId(req.params.id);
+    await ensureClubOwner(resolvedClubId, req.user!);
     const request = await prisma.clubJoinRequest.findFirst({
-      where: { id: req.params.requestId, clubId: req.params.id }
+      where: { id: req.params.requestId, clubId: resolvedClubId }
     });
     if (!request) throw new HttpError(404, "Join request not found");
 
@@ -446,8 +520,8 @@ router.patch(
 
     if (req.body.status === "APPROVED") {
       await prisma.clubMember.upsert({
-        where: { clubId_userId: { clubId: req.params.id, userId: request.userId } },
-        create: { clubId: req.params.id, userId: request.userId, membershipRole: "MEMBER" },
+        where: { clubId_userId: { clubId: resolvedClubId, userId: request.userId } },
+        create: { clubId: resolvedClubId, userId: request.userId, membershipRole: "MEMBER" },
         update: {}
       });
     }

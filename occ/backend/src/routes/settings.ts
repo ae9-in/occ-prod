@@ -10,7 +10,7 @@ const router = Router();
 
 const settingsSchema = z.object({
   themePreference: z.enum(["light", "dark", "system"]).optional(),
-  notificationPreferences: z.record(z.any()).optional()
+  notificationPreferences: z.record(z.boolean()).optional()
 });
 
 const privacySchema = z.object({

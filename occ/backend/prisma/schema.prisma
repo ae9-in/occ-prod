@@ -200,6 +200,8 @@ model Post {
   reports          Report[]
 
   @@index([createdAt])
+  @@index([deletedAt])
+  @@index([deletedAt, createdAt])
   @@index([authorId])
   @@index([clubId])
 }
@@ -230,6 +232,7 @@ model Like {
 
   @@unique([postId, userId])
   @@index([postId])
+  @@index([userId])
 }
 
 model Share {
@@ -239,6 +242,9 @@ model Share {
   createdAt DateTime @default(now())
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
 }
 
 model Report {

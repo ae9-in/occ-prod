@@ -14,11 +14,50 @@ import { fileToRelativeUrl } from "../utils/fileUrl";
 
 const router = Router();
 
+const emptyStringToUndefined = (value: unknown) => {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+  return value;
+};
+
+const emptyStringToNull = (value: unknown) => {
+  if (value === null || value === "null") {
+    return null;
+  }
+  if (typeof value === "string" && value.trim() === "") {
+    return null;
+  }
+  return value;
+};
+
+const stringToBoolean = (value: unknown) => {
+  if (value === true || value === false) {
+    return value;
+  }
+  if (typeof value === "string") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+  }
+  return value;
+};
+
+const feedQuerySchema = z.object({
+  page: z.coerce.number().optional(),
+  limit: z.coerce.number().optional(),
+  clubId: z.string().cuid().optional(),
+  authorId: z.string().cuid().optional(),
+  sort: z.enum(["latest", "popular"]).optional(),
+  includeClubPosts: z.preprocess(stringToBoolean, z.boolean().optional()),
+  includeGeneralPosts: z.preprocess(stringToBoolean, z.boolean().optional())
+});
+
 const postSchema = z.object({
-  clubId: z.string().cuid().nullable().optional(),
+  clubId: z.preprocess(emptyStringToNull, z.string().cuid().nullable().optional()),
   content: z.string().min(1).max(5000),
-  imageUrl: z.string().url().nullable().optional(),
-  visibility: z.enum(["PUBLIC", "CLUB", "MEMBERS_ONLY"]).optional()
+  imageUrl: z.preprocess(emptyStringToNull, z.string().url().nullable().optional()),
+  visibility: z.preprocess(emptyStringToUndefined, z.enum(["PUBLIC", "CLUB", "MEMBERS_ONLY"]).optional()),
+  removeImage: z.preprocess(stringToBoolean, z.boolean().optional())
 });
 
 const postUpdateSchema = postSchema.partial();
@@ -108,15 +147,37 @@ async function getPostOrThrow(postId: string, currentUser?: Express.Request["use
 router.get(
   "/feed",
   optionalAuth,
+  validate(feedQuerySchema, "query"),
   asyncHandler(async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const sort = req.query.sort === "popular" ? "popular" : "latest";
+    const includeClubPosts = req.query.includeClubPosts !== false;
+    const includeGeneralPosts = req.query.includeGeneralPosts !== false;
+    const postTypeFilter =
+      includeClubPosts && includeGeneralPosts
+        ? {}
+        : includeClubPosts
+          ? { clubId: { not: null } }
+          : includeGeneralPosts
+            ? { clubId: null }
+            : { id: "__no_matching_posts__" };
     const where = {
       deletedAt: null,
       moderationStatus: "PUBLISHED" as const,
       ...buildPostVisibilityWhere(req.user),
       ...(req.query.clubId ? { clubId: String(req.query.clubId) } : {}),
-      ...(req.query.authorId ? { authorId: String(req.query.authorId) } : {})
+      ...(req.query.authorId ? { authorId: String(req.query.authorId) } : {}),
+      ...postTypeFilter
     };
+    const orderBy =
+      sort === "popular"
+        ? [
+            { likes: { _count: "desc" as const } },
+            { comments: { _count: "desc" as const } },
+            { shares: { _count: "desc" as const } },
+            { createdAt: "desc" as const }
+          ]
+        : [{ createdAt: "desc" as const }];
 
     const [total, posts] = await Promise.all([
       prisma.post.count({ where }),
@@ -124,7 +185,7 @@ router.get(
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           author: { include: { profile: true, settings: true, privacy: true } },
           club: {
@@ -228,7 +289,7 @@ router.patch(
       data: {
         content: req.body.content,
         visibility: req.body.visibility,
-        imageUrl: uploadedImageUrl || req.body.imageUrl
+        imageUrl: req.body.removeImage ? null : uploadedImageUrl || req.body.imageUrl || undefined
       },
       include: {
         author: { include: { profile: true, settings: true, privacy: true } },

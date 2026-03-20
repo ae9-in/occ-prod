@@ -41,3 +41,7 @@ export function verifyRefreshToken(token: string) {
 export function getRefreshExpiryDate() {
   return new Date(Date.now() + parseDurationToMs(env.jwtRefreshExpiresIn));
 }
+
+export function hashStoredToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { logger } from "../lib/logger";
 import { HttpError } from "../lib/httpError";
@@ -12,6 +13,24 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
         field: issue.path.join("."),
         message: issue.message
       }))
+    });
+  }
+
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    logger.error(error);
+    return res.status(503).json({
+      success: false,
+      message: "Database unavailable",
+      errors: []
+    });
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    logger.error(error);
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      errors: []
     });
   }
 
