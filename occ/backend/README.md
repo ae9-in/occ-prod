@@ -36,6 +36,13 @@ The root-level blueprint provisions:
 - `occ-db` PostgreSQL database
 - persistent disk mounted at `/var/data` for uploads
 
+Manual Render service settings if you are not using Blueprint deploy:
+
+- Root Directory: `occ/backend`
+- Build Command: `npm run render:build`
+- Start Command: `npm run render:start`
+- Health Check Path: `/health`
+
 Required manual env values on Render before going live:
 
 - `CORS_ORIGIN`
@@ -55,6 +62,8 @@ Recommended values:
 - `npm run dev`
 - `npm run build`
 - `npm run start`
+- `npm run render:build`
+- `npm run render:start`
 - `npm run lint`
 - `npm run typecheck`
 - `npm run prisma:generate`

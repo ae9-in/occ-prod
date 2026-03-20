@@ -8,6 +8,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "render:build": "npm ci && npx prisma generate && npm run build",
+    "render:start": "npx prisma migrate deploy && node dist/server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",

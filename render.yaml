@@ -5,8 +5,8 @@ services:
     rootDir: occ/backend
     plan: starter
     autoDeploy: true
-    buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: npm run prisma:deploy && npm run start
+    buildCommand: npm run render:build
+    startCommand: npm run render:start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
