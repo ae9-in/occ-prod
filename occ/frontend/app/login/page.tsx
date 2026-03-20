@@ -70,7 +70,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border-4 border-black p-4 font-bold text-lg focus:outline-none focus:bg-brutal-gray transition-colors"
-              placeholder="admin@occ.local"
+              placeholder="example@gmail.com"
             />
           </div>
 
