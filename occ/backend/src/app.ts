@@ -24,11 +24,8 @@ fs.mkdirSync(uploadDir, { recursive: true });
 
 export const app = express();
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || ["http://localhost:3000", "https://offcampusclub.com"],
-  credentials: true
-}));
-app.options(/.*/, cors());
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(helmet({
   crossOriginResourcePolicy: false,
   contentSecurityPolicy: {
