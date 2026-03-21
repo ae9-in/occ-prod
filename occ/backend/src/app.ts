@@ -29,8 +29,8 @@ app.options(/.*/, cors(corsOptions));
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 300,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 1000, // as requested
     standardHeaders: true,
     legacyHeaders: false
   })
