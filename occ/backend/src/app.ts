@@ -24,9 +24,23 @@ fs.mkdirSync(uploadDir, { recursive: true });
 
 export const app = express();
 
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
-app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || ["http://localhost:3000", "https://offcampusclub.com"],
+  credentials: true
+}));
+app.options(/.*/, cors());
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+      connectSrc: ["'self'"],
+    }
+  }
+}));
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

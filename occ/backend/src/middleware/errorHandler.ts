@@ -29,7 +29,7 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
     logger.error(error);
     return res.status(400).json({
       success: false,
-      message: error.message,
+      message: process.env.NODE_ENV === "production" ? "Invalid request data" : error.message,
       errors: []
     });
   }
