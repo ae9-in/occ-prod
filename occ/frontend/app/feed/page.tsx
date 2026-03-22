@@ -9,6 +9,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Post } from "@/lib/dataProvider";
 import { listFeedFromApi, type FeedSettingsInput } from "@/lib/postApi";
 import ModalShell from "@/components/ModalShell";
+import { seedManyFromApi } from "@/lib/postInteractionCache";
 
 const FEED_SETTINGS_STORAGE_KEY = "occ-feed-settings";
 
@@ -109,6 +110,13 @@ export default function FeedPage() {
         setFeedPosts(feed.items);
         setCurrentPage(feed.page);
         setTotalPages(feed.totalPages);
+        // Seed interaction cache with fresh server values
+        seedManyFromApi(feed.items.map(p => ({
+          id: p.id,
+          likes: p.likes,
+          isLiked: !!p.isLiked,
+          commentsCount: p.commentsCount ?? 0,
+        })));
         setFeedEmptyMessage(
           feedSettings.showClubPosts || feedSettings.showGeneralPosts
             ? "No posts match your current feed settings."
@@ -156,6 +164,13 @@ export default function FeedPage() {
       setFeedPosts((prev) => [...prev, ...feed.items]);
       setCurrentPage(feed.page);
       setTotalPages(feed.totalPages);
+      // Seed cache for newly loaded posts
+      seedManyFromApi(feed.items.map(p => ({
+        id: p.id,
+        likes: p.likes,
+        isLiked: !!p.isLiked,
+        commentsCount: p.commentsCount ?? 0,
+      })));
     } finally {
       setIsLoadingMore(false);
     }

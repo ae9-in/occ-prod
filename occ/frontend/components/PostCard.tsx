@@ -2,6 +2,13 @@
 
 import { Post, Comment } from "@/lib/dataProvider";
 import { likePostOnApi, unlikePostOnApi, commentOnPostOnApi, listCommentsOnApi } from "@/lib/postApi";
+import {
+  getCachedInteraction,
+  seedFromApiPost,
+  setLiked as setCachedLiked,
+  rollbackLike,
+  incrementCommentCount,
+} from "@/lib/postInteractionCache";
 import { MessageSquare, ArrowBigUp, Share2, Expand, MoreHorizontal, Edit, Trash2, Flag, X } from "lucide-react";
 import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { useUser } from "@/context/UserContext";
@@ -13,11 +20,36 @@ function PostCard({ post }: { post: Post }) {
   const { user, deletePost, updatePost, isLoggedIn } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const [liked, setLiked] = useState<boolean>(!!post.isLiked);
-  const [likesCount, setLikesCount] = useState<number>(post.likes);
+
+  // Seed the cache with the latest server data whenever this component
+  // receives a new post prop (e.g. after a feed re-fetch).
+  useEffect(() => {
+    seedFromApiPost(post.id, {
+      likes: post.likes,
+      isLiked: !!post.isLiked,
+      commentsCount: post.commentsCount ?? 0,
+    });
+  }, [post.id, post.likes, post.isLiked, post.commentsCount]);
+
+  // Read initial values from cache so they survive navigation.
+  const cached = getCachedInteraction(post.id);
+  const [liked, setLiked] = useState<boolean>(cached?.isLiked ?? !!post.isLiked);
+  const [likesCount, setLikesCount] = useState<number>(cached?.likes ?? post.likes);
+  const [localCommentsCount, setLocalCommentsCount] = useState<number>(
+    cached?.commentsCount ?? post.commentsCount ?? 0
+  );
+
+  // Keep local state in sync when cache is updated from a different instance
+  // (e.g. same post visible in feed AND club page simultaneously).
+  useEffect(() => {
+    const c = getCachedInteraction(post.id);
+    if (!c) return;
+    setLiked(c.isLiked);
+    setLikesCount(c.likes);
+    setLocalCommentsCount(c.commentsCount);
+  }, [post.id]);
   const [showComments, setShowComments] = useState<boolean>(false);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [localCommentsCount, setLocalCommentsCount] = useState<number>(post.commentsCount ?? 0);
   const [commentsLoaded, setCommentsLoaded] = useState<boolean>(false);
   const [newComment, setNewComment] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -63,17 +95,15 @@ function PostCard({ post }: { post: Post }) {
       redirectToLogin();
       return;
     }
+    // Capture current state before optimistic update
+    const prevLiked = liked;
+    const prevLikes = likesCount;
     const newLikedState = !liked;
-    const newLikesCount = newLikedState ? likesCount + 1 : likesCount - 1;
-    
-    setLiked(newLikedState);
-    setLikesCount(newLikesCount);
 
-    updatePost({
-      ...post,
-      isLiked: newLikedState,
-      likes: newLikesCount
-    });
+    // Optimistically update UI and cache
+    const next = setCachedLiked(post.id, newLikedState, likesCount);
+    setLiked(newLikedState);
+    setLikesCount(next?.likes ?? (newLikedState ? likesCount + 1 : likesCount - 1));
 
     try {
       if (newLikedState) {
@@ -83,13 +113,10 @@ function PostCard({ post }: { post: Post }) {
       }
     } catch (e) {
       console.error("Failed to toggle like", e);
-      setLiked(!newLikedState);
-      setLikesCount(likesCount);
-      updatePost({
-        ...post,
-        isLiked: !newLikedState,
-        likes: likesCount
-      });
+      // Roll back both cache and local UI state
+      rollbackLike(post.id, prevLiked, prevLikes);
+      setLiked(prevLiked);
+      setLikesCount(prevLikes);
     }
   };
 
@@ -151,26 +178,19 @@ function PostCard({ post }: { post: Post }) {
     };
     
     setComments([...comments, tempComment]);
-    setLocalCommentsCount(prev => prev + 1);
+    // Update cache and local state together
+    const next = incrementCommentCount(post.id);
+    setLocalCommentsCount(next?.commentsCount ?? localCommentsCount + 1);
     setNewComment("");
-
-    updatePost({
-      ...post,
-      commentsCount: localCommentsCount + 1
-    });
 
     try {
       await commentOnPostOnApi(post.id, tempComment.content);
     } catch (e) {
       console.error("Failed to post comment", e);
       setComments(comments.filter(c => c.id !== tempId));
-      setLocalCommentsCount(prev => prev - 1);
-      updatePost({
-        ...post,
-        commentsCount: localCommentsCount
-      });
+      setLocalCommentsCount(prev => Math.max(0, prev - 1));
     }
-  }, [newComment, user, comments, isLoggedIn, redirectToLogin, localCommentsCount, post, updatePost]);
+  }, [newComment, user, comments, isLoggedIn, redirectToLogin, localCommentsCount, post.id]);
 
   useEffect(() => {
     if (showComments && !commentsLoaded) {
@@ -198,16 +218,18 @@ function PostCard({ post }: { post: Post }) {
     setShowMenu(false);
   }, [post, isLoggedIn, redirectToLogin]);
 
-  const handleSaveEdit = useCallback(() => {
+  const handleSaveEdit = useCallback(async () => {
     if (!editForm.content.trim()) return;
-    
-    const updatedPost = {
-      ...post,
-      content: editForm.content,
-      image: editForm.image
-    };
-    
-    updatePost(updatedPost);
+    try {
+      await updatePost({
+        ...post,
+        content: editForm.content,
+        image: editForm.image
+      });
+    } catch {
+      // keep the modal open on error
+      return;
+    }
     setShowEditModal(false);
   }, [editForm, post, updatePost]);
 

@@ -7,7 +7,9 @@ import { createClubOnApi, listClubsFromApi, toClubRecord, type ClubUpsertInput, 
 import { joinClubOnApi, leaveClubOnApi } from "@/lib/clubApi";
 import { requestClubJoinOnApi } from "@/lib/clubApi";
 import { createPostOnApi, deletePostOnApi, listFeedFromApi, type PostUpsertInput, updatePostOnApi } from "@/lib/postApi";
+import { seedManyFromApi } from "@/lib/postInteractionCache";
 import { fetchCurrentUser, loginWithPassword, type SessionUser } from "@/lib/authApi";
+import api from "@/lib/api";
 
 interface User extends SessionUser {}
 
@@ -241,7 +243,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const feed = await listFeedFromApi(1, 20);
         if (!isActive) return;
-        setPosts(feed.items.map(normalizePostRecord));
+        const normalized = feed.items.map(normalizePostRecord);
+        setPosts(normalized);
+        // Seed the interaction cache with fresh server values so all
+        // PostCard instances reflect real counts after any navigation.
+        seedManyFromApi(normalized.map(p => ({
+          id: p.id,
+          likes: p.likes,
+          isLiked: !!p.isLiked,
+          commentsCount: p.commentsCount ?? 0,
+        })));
       } catch {
         // Keep local data when the API is unavailable.
       }
@@ -318,6 +329,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePost = async (updatedPost: Post) => {
+    // Only send content edits to the backend. Like/unlike interactions are
+    // handled directly in PostCard via likePostOnApi/unlikePostOnApi.
     try {
       const updated = await updatePostOnApi(updatedPost.id, {
         content: updatedPost.content,
