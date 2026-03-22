@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
@@ -147,12 +147,17 @@ router.patch(
   validate(userPatchSchema),
   asyncHandler(async (req, res) => {
     await ensureManageableUserTarget(req.user!, req.params.id);
+    // P1 FIX: Explicit allowlist — never spread req.body into Prisma
+    const allowedData: Record<string, unknown> = {};
+    if (req.body.isActive !== undefined) allowedData.isActive = req.body.isActive;
+    if (req.body.status !== undefined) allowedData.status = req.body.status;
+
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: allowedData,
       include: { profile: true, settings: true, privacy: true }
     });
-    await logAdminAction(req.user!.id, "USER_PATCHED", "USER", user.id, req.body);
+    await logAdminAction(req.user!.id, "USER_PATCHED", "USER", user.id, allowedData);
     return successResponse(res, "Admin user updated successfully", { user: serializeUser(user) });
   })
 );
@@ -257,16 +262,24 @@ router.patch(
   "/admin/clubs/:id",
   validate(adminClubUpdateSchema),
   asyncHandler(async (req, res) => {
+    // P1 FIX: Explicit allowlist — ownerId, slug, id are NOT allowed
+    const allowedData: Record<string, unknown> = {};
+    if (req.body.name !== undefined) allowedData.name = req.body.name;
+    if (req.body.description !== undefined) allowedData.description = req.body.description;
+    if (req.body.visibility !== undefined) allowedData.visibility = req.body.visibility;
+    if (req.body.university !== undefined) allowedData.university = req.body.university;
+    if (req.body.locationName !== undefined) allowedData.locationName = req.body.locationName;
+
     const club = await prisma.club.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: allowedData,
       include: {
         category: true,
         owner: { include: { profile: true, settings: true, privacy: true } },
         _count: { select: { members: true, posts: true, joinRequests: true } }
       }
     });
-    await logAdminAction(req.user!.id, "CLUB_UPDATED", "CLUB", club.id, req.body);
+    await logAdminAction(req.user!.id, "CLUB_UPDATED", "CLUB", club.id, allowedData);
     return successResponse(res, "Admin club updated successfully", { club: serializeClub(club, req.user!.id) });
   })
 );
@@ -374,7 +387,13 @@ router.get(
         }
       })
     ]);
-    return paginatedResponse(res, reports, page, limit, total, "Admin reports fetched successfully");
+    // P2 FIX: Serialize user objects to strip passwordHash
+    const serializedReports = reports.map((report: any) => ({
+      ...report,
+      reporter: serializeUser(report.reporter),
+      reviewedByAdmin: serializeUser(report.reviewedByAdmin)
+    }));
+    return paginatedResponse(res, serializedReports, page, limit, total, "Admin reports fetched successfully");
   })
 );
 
@@ -390,7 +409,14 @@ router.get(
       }
     });
     if (!report) throw new HttpError(404, "Report not found");
-    return successResponse(res, "Admin report fetched successfully", { report });
+    // P2 FIX: Serialize user objects to strip passwordHash
+    return successResponse(res, "Admin report fetched successfully", {
+      report: {
+        ...report,
+        reporter: serializeUser((report as any).reporter),
+        reviewedByAdmin: serializeUser((report as any).reviewedByAdmin)
+      }
+    });
   })
 );
 

@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";

@@ -278,7 +278,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return nextUser;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // P2 FIX: Invalidate refresh token on the server before clearing localStorage
+    try {
+      const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null;
+      if (refreshToken) {
+        await api.post("/auth/logout", { refreshToken });
+      }
+    } catch {
+      // Don't block logout if the API call fails
+    }
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
