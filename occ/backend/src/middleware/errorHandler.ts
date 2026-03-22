@@ -29,6 +29,7 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
     logger.error(error);
     return res.status(400).json({
       success: false,
+<<<<<<< HEAD
       message: "Invalid request data",
       errors: []
     });
@@ -47,6 +48,9 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
     return res.status(400).json({
       success: false,
       message: prismaMessages[error.code] || "A database error occurred",
+=======
+      message: process.env.NODE_ENV === "production" ? "Invalid request data" : error.message,
+>>>>>>> 195ade86229f0bea32bcd45b1d312f7ac145fcdd
       errors: []
     });
   }
