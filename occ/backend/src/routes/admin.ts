@@ -81,7 +81,7 @@ async function ensureManageableUserTarget(actor: NonNullable<Express.Request["us
 
 async function logAdminAction(adminId: string, actionType: string, targetType: string, targetId: string, metadata: Record<string, unknown> = {}) {
   await prisma.adminActionLog.create({
-    data: { adminId, actionType, targetType, targetId, metadata }
+    data: { adminId, actionType, targetType, targetId, metadata: metadata as any }
   });
 }
 
@@ -126,7 +126,7 @@ router.get(
       })
     ]);
 
-    return paginatedResponse(res, users.map(serializeUser), page, limit, total, "Admin users fetched successfully");
+    return paginatedResponse(res, users.map((u) => serializeUser(u as any)), page, limit, total, "Admin users fetched successfully");
   })
 );
 
@@ -134,11 +134,11 @@ router.get(
   "/admin/users/:id",
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       include: { profile: true, settings: true, privacy: true }
     });
     if (!user) throw new HttpError(404, "User not found");
-    return successResponse(res, "Admin user fetched successfully", { user: serializeUser(user) });
+    return successResponse(res, "Admin user fetched successfully", { user: serializeUser(user as any) });
   })
 );
 
@@ -146,19 +146,19 @@ router.patch(
   "/admin/users/:id",
   validate(userPatchSchema),
   asyncHandler(async (req, res) => {
-    await ensureManageableUserTarget(req.user!, req.params.id);
+    await ensureManageableUserTarget(req.user!, (req.params.id as string));
     // P1 FIX: Explicit allowlist — never spread req.body into Prisma
     const allowedData: Record<string, unknown> = {};
     if (req.body.isActive !== undefined) allowedData.isActive = req.body.isActive;
     if (req.body.status !== undefined) allowedData.status = req.body.status;
 
     const user = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: allowedData,
       include: { profile: true, settings: true, privacy: true }
     });
     await logAdminAction(req.user!.id, "USER_PATCHED", "USER", user.id, allowedData);
-    return successResponse(res, "Admin user updated successfully", { user: serializeUser(user) });
+    return successResponse(res, "Admin user updated successfully", { user: serializeUser(user as any) });
   })
 );
 
@@ -166,14 +166,14 @@ router.patch(
   "/admin/users/:id/status",
   validate(userStatusSchema),
   asyncHandler(async (req, res) => {
-    await ensureManageableUserTarget(req.user!, req.params.id);
+    await ensureManageableUserTarget(req.user!, (req.params.id as string));
     const user = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: { status: req.body.status, isActive: req.body.status === "ACTIVE" },
       include: { profile: true, settings: true, privacy: true }
     });
     await logAdminAction(req.user!.id, "USER_STATUS_UPDATED", "USER", user.id, req.body);
-    return successResponse(res, "User status updated successfully", { user: serializeUser(user) });
+    return successResponse(res, "User status updated successfully", { user: serializeUser(user as any) });
   })
 );
 
@@ -181,7 +181,7 @@ router.patch(
   "/admin/users/:id/role",
   validate(userRoleSchema),
   asyncHandler(async (req, res) => {
-    const target = await ensureManageableUserTarget(req.user!, req.params.id);
+    const target = await ensureManageableUserTarget(req.user!, (req.params.id as string));
 
     if (req.user!.role !== "SUPER_ADMIN" && ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(req.body.role)) {
       throw new HttpError(403, "Only super admins can assign platform-level admin roles");
@@ -192,12 +192,12 @@ router.patch(
     }
 
     const user = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: { role: req.body.role },
       include: { profile: true, settings: true, privacy: true }
     });
     await logAdminAction(req.user!.id, "USER_ROLE_UPDATED", "USER", user.id, req.body);
-    return successResponse(res, "User role updated successfully", { user: serializeUser(user) });
+    return successResponse(res, "User role updated successfully", { user: serializeUser(user as any) });
   })
 );
 
@@ -271,7 +271,7 @@ router.patch(
     if (req.body.locationName !== undefined) allowedData.locationName = req.body.locationName;
 
     const club = await prisma.club.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: allowedData,
       include: {
         category: true,
@@ -280,15 +280,15 @@ router.patch(
       }
     });
     await logAdminAction(req.user!.id, "CLUB_UPDATED", "CLUB", club.id, allowedData);
-    return successResponse(res, "Admin club updated successfully", { club: serializeClub(club, req.user!.id) });
+    return successResponse(res, "Admin club updated successfully", { club: serializeClub(club as any, req.user!.id) });
   })
 );
 
 router.delete(
   "/admin/clubs/:id",
   asyncHandler(async (req, res) => {
-    await prisma.club.delete({ where: { id: req.params.id } });
-    await logAdminAction(req.user!.id, "CLUB_DELETED", "CLUB", req.params.id, {});
+    await prisma.club.delete({ where: { id: (req.params.id as string) as string } });
+    await logAdminAction(req.user!.id, "CLUB_DELETED", "CLUB", (req.params.id as string) as string, {});
     return successResponse(res, "Admin club deleted successfully", {});
   })
 );
@@ -336,10 +336,10 @@ router.delete(
   "/admin/posts/:id",
   asyncHandler(async (req, res) => {
     await prisma.post.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: { deletedAt: new Date(), moderationStatus: "REMOVED" }
     });
-    await logAdminAction(req.user!.id, "POST_REMOVED", "POST", req.params.id, {});
+    await logAdminAction(req.user!.id, "POST_REMOVED", "POST", (req.params.id as string) as string, {});
     return successResponse(res, "Admin post deleted successfully", {});
   })
 );
@@ -349,7 +349,7 @@ router.patch(
   validate(z.object({ moderationStatus: z.enum(["PUBLISHED", "PENDING", "REJECTED", "REMOVED"]) })),
   asyncHandler(async (req, res) => {
     const post = await prisma.post.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: { moderationStatus: req.body.moderationStatus },
       include: {
         author: { include: { profile: true, settings: true, privacy: true } },
@@ -364,7 +364,7 @@ router.patch(
       }
     });
     await logAdminAction(req.user!.id, "POST_MODERATED", "POST", post.id, req.body);
-    return successResponse(res, "Post moderation updated successfully", { post: serializePost(post, req.user!.id) });
+    return successResponse(res, "Post moderation updated successfully", { post: serializePost(post as any, req.user!.id) });
   })
 );
 
@@ -401,7 +401,7 @@ router.get(
   "/admin/reports/:id",
   asyncHandler(async (req, res) => {
     const report = await prisma.report.findUnique({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       include: {
         post: true,
         reporter: { include: { profile: true, settings: true, privacy: true } },
@@ -425,7 +425,7 @@ router.patch(
   validate(reportSchema),
   asyncHandler(async (req, res) => {
     const report = await prisma.report.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: {
         status: req.body.status,
         reviewedByAdminId: req.user!.id,
@@ -462,7 +462,7 @@ router.patch(
   validate(categorySchema),
   asyncHandler(async (req, res) => {
     const category = await prisma.category.update({
-      where: { id: req.params.id },
+      where: { id: (req.params.id as string) as string },
       data: { name: req.body.name, slug: await ensureUniqueSlug(prisma.category, req.body.name) }
     });
     await logAdminAction(req.user!.id, "CATEGORY_UPDATED", "CATEGORY", category.id, req.body);
@@ -473,8 +473,8 @@ router.patch(
 router.delete(
   "/admin/categories/:id",
   asyncHandler(async (req, res) => {
-    await prisma.category.delete({ where: { id: req.params.id } });
-    await logAdminAction(req.user!.id, "CATEGORY_DELETED", "CATEGORY", req.params.id, {});
+    await prisma.category.delete({ where: { id: (req.params.id as string) as string } });
+    await logAdminAction(req.user!.id, "CATEGORY_DELETED", "CATEGORY", (req.params.id as string) as string, {});
     return successResponse(res, "Category deleted successfully", {});
   })
 );
