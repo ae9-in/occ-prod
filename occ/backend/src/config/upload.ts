@@ -16,12 +16,17 @@ function ensureWritableUploadDir(targetDir: string) {
 function resolveUploadDir() {
   try {
     return ensureWritableUploadDir(requestedUploadDir);
-  } catch (error) {
+  } catch (error: any) {
+    const isPermissionError = error?.code === "EACCES" || error?.code === "EPERM";
+    const isSystemDir = requestedUploadDir.startsWith("/var") || requestedUploadDir.startsWith("/opt") || requestedUploadDir.startsWith("/etc");
+
     if (requestedUploadDir !== fallbackUploadDir) {
-      console.warn(
-        `Upload directory "${requestedUploadDir}" is not writable. Falling back to "${fallbackUploadDir}".`,
-        error
-      );
+      if (!(isPermissionError && isSystemDir)) {
+        console.warn(
+          `Upload directory "${requestedUploadDir}" is not writable. Falling back to "${fallbackUploadDir}".`,
+          error
+        );
+      }
       return ensureWritableUploadDir(fallbackUploadDir);
     }
 
