@@ -7,7 +7,7 @@ import { type Post } from "@/lib/dataProvider";
 import { useUser } from "@/context/UserContext";
 import { useRouter } from "next/navigation";
 import ImageWithFallback from "@/components/ImageWithFallback";
-import { getPostByIdFromApi } from "@/lib/postApi";
+import { getPostByIdFromApi, likePostOnApi, unlikePostOnApi } from "@/lib/postApi";
 
 interface PostPageProps {
   params: Promise<{
@@ -45,6 +45,7 @@ export default function PostPage({ params }: PostPageProps) {
         if (!isActive || !fetched) return;
         setPost(fetched);
         setLikesCount(fetched.likes);
+        setLiked(!!fetched.isLiked);
       } catch {
         // Keep the local fallback if the API is unavailable.
       }
@@ -61,14 +62,29 @@ export default function PostPage({ params }: PostPageProps) {
     router.push(`/login?next=${encodeURIComponent(postId ? `/post/${postId}` : "/feed")}`);
   }, [postId, router]);
 
-  const toggleLike = useCallback(() => {
+  const toggleLike = useCallback(async () => {
     if (!isLoggedIn) {
       redirectToLogin();
       return;
     }
-    setLiked((prev) => !prev);
-    setLikesCount((prev) => (liked ? prev - 1 : prev + 1));
-  }, [liked, isLoggedIn, redirectToLogin]);
+    const newLikedState = !liked;
+    const newLikesCount = newLikedState ? likesCount + 1 : likesCount - 1;
+    
+    setLiked(newLikedState);
+    setLikesCount(newLikesCount);
+
+    try {
+      if (newLikedState) {
+        await likePostOnApi(postId);
+      } else {
+        await unlikePostOnApi(postId);
+      }
+    } catch (e) {
+      console.error("Failed to toggle like", e);
+      setLiked(!newLikedState);
+      setLikesCount(likesCount);
+    }
+  }, [liked, likesCount, isLoggedIn, redirectToLogin, postId]);
 
   const copyToClipboard = useCallback(async (value: string) => {
     if (navigator.clipboard?.writeText) {
