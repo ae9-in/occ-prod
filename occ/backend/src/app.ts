@@ -23,7 +23,7 @@ import searchRoutes from "./routes/search";
 fs.mkdirSync(uploadDir, { recursive: true });
 
 export const app = express();
-
+app.disable("x-powered-by");
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 app.use(helmet({ crossOriginResourcePolicy: false }));

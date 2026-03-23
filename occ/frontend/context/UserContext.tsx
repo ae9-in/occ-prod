@@ -9,6 +9,7 @@ import { requestClubJoinOnApi } from "@/lib/clubApi";
 import { createPostOnApi, deletePostOnApi, listFeedFromApi, type PostUpsertInput, updatePostOnApi } from "@/lib/postApi";
 import { fetchCurrentUser, loginWithPassword, type SessionUser } from "@/lib/authApi";
 
+
 interface User extends SessionUser {}
 
 interface UserContextType {
@@ -278,7 +279,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return nextUser;
   };
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
