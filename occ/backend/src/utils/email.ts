@@ -51,8 +51,14 @@ export const sendPasswordResetEmail = async (to: string, resetToken: string) => 
       throw new Error("Failed to send email");
     }
   } else {
+<<<<<<< HEAD
     logger.warn("SMTP configuration is missing. Password reset email was not sent.");
     logger.info(`To: ${to}`);
     logger.info(`Reset token generated (token hidden from logs for security)`);
+=======
+    logger.warn("SMTP configuration is missing. Mocking password reset email payload:");
+    logger.info(`To: ${to}`);
+    logger.info(`Reset Link: ${resetLink}`);
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
   }
 };

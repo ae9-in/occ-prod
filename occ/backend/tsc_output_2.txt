@@ -1,0 +1,5 @@
+﻿src/routes/posts.ts(154,30): error TS2367: This comparison appears to be unintentional because the types 'string | ParsedQs | (string | ParsedQs)[] | undefined' and 'boolean' have no overlap.
+src/routes/posts.ts(155,33): error TS2367: This comparison appears to be unintentional because the types 'string | ParsedQs | (string | ParsedQs)[] | undefined' and 'boolean' have no overlap.
+src/routes/posts.ts(365,88): error TS2345: Argument of type '(comment: CommentWithRelations | null | undefined, userView?: UserView) => { id: string; content: string; parentId: string | null; createdAt: Date; updatedAt: Date; author: { ...; } | null; } | null' is not assignable to parameter of type '(value: { author: { profile: { id: string; createdAt: Date; updatedAt: Date; userId: string; university: string | null; displayName: string; bio: string | null; phoneNumber: string | null; hobbies: string | null; avatarUrl: string | null; coverUrl: string | null; } | null; settings: { ...; } | null; privacy: { ...; ...'.
+  Types of parameters 'userView' and 'index' are incompatible.
+    Type 'number' is not assignable to type 'UserView | undefined'.

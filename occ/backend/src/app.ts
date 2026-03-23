@@ -26,11 +26,22 @@ export const app = express();
 app.disable("x-powered-by");
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
-app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+      connectSrc: ["'self'"],
+    }
+  }
+}));
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 300,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 1000, // as requested
     standardHeaders: true,
     legacyHeaders: false
   })

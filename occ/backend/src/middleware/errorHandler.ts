@@ -44,9 +44,18 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
       P2014: "This change would violate a required relation",
       P2016: "Query interpretation error"
     };
+<<<<<<< HEAD
     return res.status(400).json({
       success: false,
       message: prismaMessages[error.code] || "A database error occurred",
+=======
+
+    const code = (error as any).code;
+
+    return res.status(400).json({
+      success: false,
+      message: prismaMessages[code] || "A database error occurred",
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
       errors: []
     });
   }

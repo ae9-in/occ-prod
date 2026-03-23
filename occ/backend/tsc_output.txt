@@ -1,0 +1,129 @@
+﻿src/routes/admin.ts(137,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(149,49): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(156,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(169,49): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(171,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(184,64): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(195,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(274,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(290,41): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(291,64): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(339,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(342,64): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(352,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(404,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(428,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(465,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(476,45): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/admin.ts(477,72): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(121,37): error TS2339: Property 'members' does not exist on type '{ name: string; id: string; createdAt: Date; updatedAt: Date; slug: string; description: string; categoryId: string | null; university: string | null; locationName: string | null; ... 5 more ...; ownerId: string; }'.
+src/routes/clubs.ts(121,52): error TS7006: Parameter 'member' implicitly has an 'any' type.
+src/routes/clubs.ts(232,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Club"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Club"> | undefined'.
+src/routes/clubs.ts(232,39): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Club"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Club"> | undefined'.
+src/routes/clubs.ts(257,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(293,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(304,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(327,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(349,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(380,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(385,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+src/routes/clubs.ts(385,45): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+src/routes/clubs.ts(404,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(417,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+src/routes/clubs.ts(417,45): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClubMember"> | undefined'.
+src/routes/clubs.ts(430,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(482,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(509,52): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/clubs.ts(512,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"ClubJoinRequest"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"ClubJoinRequest"> | undefined'.
+src/routes/posts.ts(154,30): error TS2367: This comparison appears to be unintentional because the types 'string | ParsedQs | (string | ParsedQs)[] | undefined' and 'boolean' have no overlap.
+src/routes/posts.ts(155,33): error TS2367: This comparison appears to be unintentional because the types 'string | ParsedQs | (string | ParsedQs)[] | undefined' and 'boolean' have no overlap.
+src/routes/posts.ts(269,48): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(280,62): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(288,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(317,62): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(324,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(336,26): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(338,33): error TS2322: Type 'string | string[]' is not assignable to type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(339,17): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(350,45): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Like"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Like"> | undefined'.
+src/routes/posts.ts(359,26): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(361,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | StringFilter<"Comment"> | undefined'.
+  Type 'string[]' is not assignable to type 'string | StringFilter<"Comment"> | undefined'.
+src/routes/posts.ts(365,88): error TS2345: Argument of type '(comment: CommentWithRelations | null | undefined, userView?: UserView) => { id: string; content: string; parentId: string | null; createdAt: Date; updatedAt: Date; author: { ...; } | null; } | null' is not assignable to parameter of type '(value: { id: string; createdAt: Date; updatedAt: Date; authorId: string; content: string; postId: string; parentId: string | null; }, index: number, array: { id: string; createdAt: Date; ... 4 more ...; parentId: string | null; }[]) => { ...; } | null'.
+  Types of parameters 'userView' and 'index' are incompatible.
+    Type 'number' is not assignable to type 'UserView | undefined'.
+src/routes/posts.ts(374,26): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(377,9): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(392,26): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(393,55): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(403,26): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/posts.ts(406,9): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/users.ts(93,16): error TS2322: Type 'string | string[]' is not assignable to type 'string | undefined'.
+  Type 'string[]' is not assignable to type 'string'.
+src/routes/users.ts(124,37): error TS2339: Property 'privacy' does not exist on type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }'.
+src/routes/users.ts(129,27): error TS2345: Argument of type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }' is not assignable to parameter of type 'UserWithRelations'.
+  Type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }' is missing the following properties from type '{ profile: { id: string; createdAt: Date; updatedAt: Date; userId: string; university: string | null; displayName: string; bio: string | null; phoneNumber: string | null; hobbies: string | null; avatarUrl: string | null; coverUrl: string | null; } | null; settings: { ...; } | null; privacy: { ...; } | null; }': profile, settings, privacy
+src/routes/users.ts(131,14): error TS2339: Property 'privacy' does not exist on type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }'.
+src/routes/users.ts(133,18): error TS2339: Property 'memberships' does not exist on type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }'.
+src/routes/users.ts(133,35): error TS7006: Parameter 'membership' implicitly has an 'any' type.
+src/routes/users.ts(140,25): error TS2339: Property '_count' does not exist on type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }'.
+src/routes/users.ts(141,31): error TS2339: Property '_count' does not exist on type '{ status: UserStatus; id: string; email: string; passwordHash: string; role: UserRole; isActive: boolean; createdAt: Date; updatedAt: Date; }'.
+src/routes/users.ts(164,27): error TS2322: Type '{ OR?: ({ clubId: null; visibility: "PUBLIC"; club?: undefined; } | { visibility: "PUBLIC"; club: { is: { visibility: "PUBLIC"; }; }; clubId?: undefined; })[] | undefined; authorId: string | string[]; deletedAt: null; moderationStatus: "PUBLISHED"; }' is not assignable to type 'PostWhereInput'.
+  Types of property 'authorId' are incompatible.
+    Type 'string | string[]' is not assignable to type 'string | StringFilter<"Post"> | undefined'.
+      Type 'string[]' is not assignable to type 'string | StringFilter<"Post"> | undefined'.
+src/routes/users.ts(166,9): error TS2322: Type '{ OR?: ({ clubId: null; visibility: "PUBLIC"; club?: undefined; } | { visibility: "PUBLIC"; club: { is: { visibility: "PUBLIC"; }; }; clubId?: undefined; })[] | undefined; authorId: string | string[]; deletedAt: null; moderationStatus: "PUBLISHED"; }' is not assignable to type 'PostWhereInput'.
+  Types of property 'authorId' are incompatible.
+    Type 'string | string[]' is not assignable to type 'string | StringFilter<"Post"> | undefined'.
+      Type 'string[]' is not assignable to type 'string | StringFilter<"Post"> | undefined'.

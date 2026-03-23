@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
@@ -151,8 +151,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
     const sort = req.query.sort === "popular" ? "popular" : "latest";
-    const includeClubPosts = req.query.includeClubPosts !== false;
-    const includeGeneralPosts = req.query.includeGeneralPosts !== false;
+    const includeClubPosts = req.query.includeClubPosts !== "false";
+    const includeGeneralPosts = req.query.includeGeneralPosts !== "false";
     const postTypeFilter =
       includeClubPosts && includeGeneralPosts
         ? {}
@@ -266,7 +266,11 @@ router.get(
   optionalAuth,
   asyncHandler(async (req, res) =>
     successResponse(res, "Post fetched successfully", {
+<<<<<<< HEAD
       post: serializePost(await getPostOrThrow(req.params.id as string, req.user), req.user?.id || null)
+=======
+      post: serializePost(await getPostOrThrow((req.params.id as string), req.user), req.user?.id || null)
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
     })
   )
 );
@@ -277,7 +281,11 @@ router.patch(
   upload.single("image"),
   validate(postUpdateSchema),
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     const existing = await prisma.post.findUnique({ where: { id: req.params.id as string } });
+=======
+    const existing = await prisma.post.findUnique({ where: { id: (req.params.id as string) } });
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
     if (!existing || existing.deletedAt) throw new HttpError(404, "Post not found");
     if (existing.authorId !== req.user!.id && !["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(req.user!.role)) {
       throw new HttpError(403, "You can only edit your own posts");
@@ -285,7 +293,11 @@ router.patch(
 
     const uploadedImageUrl = fileToRelativeUrl(req.file || undefined);
     const post = await prisma.post.update({
+<<<<<<< HEAD
       where: { id: req.params.id as string },
+=======
+      where: { id: (req.params.id as string) },
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
       data: {
         content: req.body.content,
         visibility: req.body.visibility,
@@ -314,14 +326,22 @@ router.delete(
   "/posts/:id",
   requireAuth,
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     const existing = await prisma.post.findUnique({ where: { id: req.params.id as string } });
+=======
+    const existing = await prisma.post.findUnique({ where: { id: (req.params.id as string) } });
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
     if (!existing || existing.deletedAt) throw new HttpError(404, "Post not found");
     if (existing.authorId !== req.user!.id && !["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(req.user!.role)) {
       throw new HttpError(403, "You can only delete your own posts");
     }
 
     await prisma.post.update({
+<<<<<<< HEAD
       where: { id: req.params.id as string },
+=======
+      where: { id: (req.params.id as string) },
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
       data: { deletedAt: new Date(), moderationStatus: "REMOVED" }
     });
 
@@ -333,10 +353,17 @@ router.post(
   "/posts/:id/like",
   requireAuth,
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     await getPostOrThrow(req.params.id as string, req.user);
     await prisma.like.upsert({
       where: { postId_userId: { postId: req.params.id as string, userId: req.user!.id } },
       create: { postId: req.params.id as string, userId: req.user!.id },
+=======
+    await getPostOrThrow((req.params.id as string), req.user);
+    await prisma.like.upsert({
+      where: { postId_userId: { postId: (req.params.id as string), userId: req.user!.id } },
+      create: { postId: (req.params.id as string), userId: req.user!.id },
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
       update: {}
     });
     return successResponse(res, "Post liked successfully", {});
@@ -347,7 +374,11 @@ router.delete(
   "/posts/:id/like",
   requireAuth,
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     await prisma.like.deleteMany({ where: { postId: req.params.id as string, userId: req.user!.id } });
+=======
+    await prisma.like.deleteMany({ where: { postId: (req.params.id as string), userId: req.user!.id } });
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
     return successResponse(res, "Post unliked successfully", {});
   })
 );
@@ -356,6 +387,7 @@ router.get(
   "/posts/:id/comments",
   optionalAuth,
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     await getPostOrThrow(req.params.id as string, req.user);
     const comments = await prisma.comment.findMany({
       where: { postId: req.params.id as string },
@@ -363,6 +395,15 @@ router.get(
       include: { author: { include: { profile: true, settings: true, privacy: true } } }
     });
     return successResponse(res, "Comments fetched successfully", { items: comments.map(c => serializeComment(c)) });
+=======
+    await getPostOrThrow((req.params.id as string), req.user);
+    const comments = await prisma.comment.findMany({
+      where: { postId: (req.params.id as string) },
+      orderBy: { createdAt: "asc" },
+      include: { author: { include: { profile: true, settings: true, privacy: true } } }
+    });
+    return successResponse(res, "Comments fetched successfully", { items: comments.map((c) => serializeComment(c as any)) });
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
   })
 );
 
@@ -371,10 +412,17 @@ router.post(
   requireAuth,
   validate(commentSchema),
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     await getPostOrThrow(req.params.id as string, req.user);
     const comment = await prisma.comment.create({
       data: {
         postId: req.params.id as string,
+=======
+    await getPostOrThrow((req.params.id as string), req.user);
+    const comment = await prisma.comment.create({
+      data: {
+        postId: (req.params.id as string),
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
         authorId: req.user!.id,
         content: req.body.content,
         parentId: req.body.parentId || null
@@ -389,8 +437,13 @@ router.post(
   "/posts/:id/share",
   requireAuth,
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     await getPostOrThrow(req.params.id as string, req.user);
     const share = await prisma.share.create({ data: { postId: req.params.id as string, userId: req.user!.id } });
+=======
+    await getPostOrThrow((req.params.id as string), req.user);
+    const share = await prisma.share.create({ data: { postId: (req.params.id as string), userId: req.user!.id } });
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
     return successResponse(res, "Post shared successfully", { share });
   })
 );
@@ -400,10 +453,17 @@ router.post(
   requireAuth,
   validate(reportSchema),
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     await getPostOrThrow(req.params.id as string, req.user);
     const report = await prisma.report.create({
       data: {
         postId: req.params.id as string,
+=======
+    await getPostOrThrow((req.params.id as string), req.user);
+    const report = await prisma.report.create({
+      data: {
+        postId: (req.params.id as string),
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
         reporterId: req.user!.id,
         reason: req.body.reason,
         description: req.body.description || null

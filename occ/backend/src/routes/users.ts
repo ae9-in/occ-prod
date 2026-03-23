@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
@@ -90,7 +90,11 @@ router.get(
   optionalAuth,
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
+<<<<<<< HEAD
       where: { id: req.params.id as string },
+=======
+      where: { id: (req.params.id as string) as string },
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
       include: {
         profile: true,
         settings: true,
@@ -128,9 +132,13 @@ router.get(
     return successResponse(res, "Public user profile fetched successfully", {
       user: serializeUser(user as any, isSelf || isAdmin ? "private" : "public"),
       memberships:
-        user.privacy?.showClubMembership === false
+        (user as any).privacy?.showClubMembership === false
           ? []
+<<<<<<< HEAD
           : user.memberships.map((membership: any) => ({
+=======
+          : (user as any).memberships.map((membership: any) => ({
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
               id: membership.id,
               membershipRole: membership.membershipRole,
               joinedAt: membership.joinedAt,
@@ -150,14 +158,21 @@ router.get(
   asyncHandler(async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
     const where = {
+<<<<<<< HEAD
       authorId: req.params.id as string,
       deletedAt: null,
       moderationStatus: "PUBLISHED" as const,
       ...(req.user?.id === req.params.id as string || ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(req.user?.role || "USER")
+=======
+      ...(req.user?.id === (req.params.id as string) || ["PLATFORM_ADMIN", "SUPER_ADMIN"].includes(req.user?.role || "USER")
+>>>>>>> 93c39e655dc0786e985098960f3e3ae4eeb955b3
         ? {}
         : {
             OR: [{ clubId: null, visibility: "PUBLIC" as const }, { visibility: "PUBLIC" as const, club: { is: { visibility: "PUBLIC" as const } } }]
-          })
+          }),
+      authorId: (req.params.id as string) as string,
+      deletedAt: null,
+      moderationStatus: "PUBLISHED" as const,
     };
 
     const [total, posts] = await Promise.all([

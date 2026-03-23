@@ -7,7 +7,13 @@ import { type Post } from "@/lib/dataProvider";
 import { useUser } from "@/context/UserContext";
 import { useRouter } from "next/navigation";
 import ImageWithFallback from "@/components/ImageWithFallback";
-import { getPostByIdFromApi } from "@/lib/postApi";
+import { getPostByIdFromApi, likePostOnApi, unlikePostOnApi } from "@/lib/postApi";
+import {
+  getCachedInteraction,
+  seedFromApiPost,
+  setLiked as setCachedLiked,
+  rollbackLike,
+} from "@/lib/postInteractionCache";
 
 interface PostPageProps {
   params: Promise<{
@@ -18,16 +24,30 @@ interface PostPageProps {
 export default function PostPage({ params }: PostPageProps) {
   const { user, isLoggedIn, posts } = useUser();
   const router = useRouter();
-  const [liked, setLiked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [comments, setComments] = useState<{ id: string; author: string; content: string }[]>([]);
   const [newComment, setNewComment] = useState("");
   const [postId, setPostId] = useState<string>("");
   const [post, setPost] = useState<Post | null>(null);
-  const [likesCount, setLikesCount] = useState(0);
   const localPost = useMemo(() => posts.find((item) => item.id === postId) || null, [postId, posts]);
   const resolvedPost = post || localPost;
-  const resolvedLikesCount = post ? likesCount : localPost?.likes || likesCount;
+
+  // Read initial interaction state from cache so it persists across navigation.
+  const cached = postId ? getCachedInteraction(postId) : null;
+  const [liked, setLiked] = useState<boolean>(cached?.isLiked ?? false);
+  const [likesCount, setLikesCount] = useState<number>(cached?.likes ?? 0);
+
+  // Sync from cache whenever postId resolves (handles deferred params).
+  useEffect(() => {
+    if (!postId) return;
+    const c = getCachedInteraction(postId);
+    if (c) {
+      setLiked(c.isLiked);
+      setLikesCount(c.likes);
+    }
+  }, [postId]);
+
+  const resolvedLikesCount = likesCount;
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -44,6 +64,13 @@ export default function PostPage({ params }: PostPageProps) {
         const fetched = await getPostByIdFromApi(postId);
         if (!isActive || !fetched) return;
         setPost(fetched);
+        // Seed cache with fresh API data, then update local state from cache
+        seedFromApiPost(postId, {
+          likes: fetched.likes,
+          isLiked: !!fetched.isLiked,
+          commentsCount: fetched.commentsCount ?? 0,
+        });
+        setLiked(!!fetched.isLiked);
         setLikesCount(fetched.likes);
       } catch {
         // Keep the local fallback if the API is unavailable.
@@ -61,14 +88,33 @@ export default function PostPage({ params }: PostPageProps) {
     router.push(`/login?next=${encodeURIComponent(postId ? `/post/${postId}` : "/feed")}`);
   }, [postId, router]);
 
-  const toggleLike = useCallback(() => {
+  const toggleLike = useCallback(async () => {
     if (!isLoggedIn) {
       redirectToLogin();
       return;
     }
-    setLiked((prev) => !prev);
-    setLikesCount((prev) => (liked ? prev - 1 : prev + 1));
-  }, [liked, isLoggedIn, redirectToLogin]);
+    const prevLiked = liked;
+    const prevLikes = likesCount;
+    const newLikedState = !liked;
+
+    // Optimistically update cache and UI
+    const next = setCachedLiked(postId, newLikedState, likesCount);
+    setLiked(newLikedState);
+    setLikesCount(next?.likes ?? (newLikedState ? likesCount + 1 : Math.max(0, likesCount - 1)));
+
+    try {
+      if (newLikedState) {
+        await likePostOnApi(postId);
+      } else {
+        await unlikePostOnApi(postId);
+      }
+    } catch (e) {
+      console.error("Failed to toggle like", e);
+      rollbackLike(postId, prevLiked, prevLikes);
+      setLiked(prevLiked);
+      setLikesCount(prevLikes);
+    }
+  }, [liked, likesCount, isLoggedIn, redirectToLogin, postId]);
 
   const copyToClipboard = useCallback(async (value: string) => {
     if (navigator.clipboard?.writeText) {
