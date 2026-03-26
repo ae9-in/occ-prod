@@ -1,12 +1,13 @@
 "use client";
 
 import type { ImgHTMLAttributes } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { normalizeAssetUrl } from "@/lib/assetUrl";
 
 type ImageWithFallbackProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
   fallbackSrc: string;
   src?: string | null;
+  hideOnError?: boolean;
 };
 
 const isRenderableImageSrc = (value?: string | null) => {
@@ -14,21 +15,19 @@ const isRenderableImageSrc = (value?: string | null) => {
   return !!normalized && !normalized.startsWith("blob:") && !normalized.startsWith("file:");
 };
 
-export default function ImageWithFallback({
+function ImageWithFallbackInner({
   alt,
   fallbackSrc,
-  src,
+  initialSrc,
+  hideOnError,
   ...props
-}: ImageWithFallbackProps) {
-  const resolvedSrc = useMemo(
-    () => (isRenderableImageSrc(src) ? normalizeAssetUrl(src, fallbackSrc)! : fallbackSrc),
-    [fallbackSrc, src],
-  );
-  const [currentSrc, setCurrentSrc] = useState(resolvedSrc);
+}: Omit<ImageWithFallbackProps, "src"> & { initialSrc: string }) {
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [isHidden, setIsHidden] = useState(false);
 
-  useEffect(() => {
-    setCurrentSrc(resolvedSrc);
-  }, [resolvedSrc]);
+  if (hideOnError && isHidden) {
+    return null;
+  }
 
   return (
     <img
@@ -36,10 +35,39 @@ export default function ImageWithFallback({
       alt={alt}
       src={currentSrc}
       onError={() => {
+        if (hideOnError) {
+          setIsHidden(true);
+          return;
+        }
+
         if (currentSrc !== fallbackSrc) {
           setCurrentSrc(fallbackSrc);
         }
       }}
+    />
+  );
+}
+
+export default function ImageWithFallback({
+  alt,
+  fallbackSrc,
+  src,
+  hideOnError = false,
+  ...props
+}: ImageWithFallbackProps) {
+  const resolvedSrc = useMemo(
+    () => (isRenderableImageSrc(src) ? normalizeAssetUrl(src, fallbackSrc)! : fallbackSrc),
+    [fallbackSrc, src],
+  );
+
+  return (
+    <ImageWithFallbackInner
+      key={resolvedSrc}
+      alt={alt}
+      fallbackSrc={fallbackSrc}
+      initialSrc={resolvedSrc}
+      hideOnError={hideOnError}
+      {...props}
     />
   );
 }

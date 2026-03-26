@@ -358,7 +358,7 @@ function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (postId: string
           <p className="text-xl md:text-2xl font-black uppercase leading-tight text-black border-l-4 border-brutal-blue pl-4 py-1">{post.content}</p>
           {safePostImage && (
             <div className="relative group/image overflow-hidden border-4 border-black bg-[#eef3ff] shadow-[4px_4px_0_0_#000] aspect-[4/3]">
-              <ImageWithFallback src={safePostImage} fallbackSrc="/window.svg" alt="Post visual" className="w-full h-full object-contain p-4 transition-transform duration-300 group-hover/image:scale-[1.02]" />
+              <ImageWithFallback src={safePostImage} fallbackSrc="/window.svg" hideOnError alt="Post visual" className="w-full h-full object-contain p-4 transition-transform duration-300 group-hover/image:scale-[1.02]" />
               <div className="absolute top-4 right-4 bg-white border-2 border-black p-2 shadow-[2px_2px_0_0_#000] opacity-0 group-hover/image:opacity-100 transition-opacity cursor-pointer">
                 <Expand className="w-5 h-5 text-black" />
               </div>
@@ -580,6 +580,7 @@ function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (postId: string
 }
 
 export default memo(PostCard);
+
 
 
 
