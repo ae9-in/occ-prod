@@ -1,6 +1,7 @@
 "use client";
 
 import api from "@/lib/api";
+import { normalizeAssetUrl } from "@/lib/assetUrl";
 
 export interface SessionUser {
   id: string;
@@ -72,7 +73,7 @@ export const mapApiUserToSessionUser = (user: ApiUserResponse): SessionUser => (
   name: user.profile?.displayName || user.email || "Admin",
   university: user.profile?.university || "",
   createdAt: user.createdAt,
-  profilePicture: user.profile?.avatarUrl || undefined,
+  profilePicture: normalizeAssetUrl(user.profile?.avatarUrl) || undefined,
   phoneNumber: user.profile?.phoneNumber || undefined,
   hobbies: user.profile?.hobbies || undefined,
   role: user.role,
@@ -112,7 +113,7 @@ export async function fetchCurrentProfile() {
         slug: item.club!.slug || item.club!.id,
         name: item.club!.name,
         role: item.membershipRole,
-        logo: item.club!.logoUrl || "/globe.svg",
+        logo: normalizeAssetUrl(item.club!.logoUrl, "/globe.svg") || "/globe.svg",
         description: item.club!.description || "",
         university: item.club!.university || "",
         category: item.club!.category?.name || "",

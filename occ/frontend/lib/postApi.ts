@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import { normalizeAssetUrl } from "@/lib/assetUrl";
 import type { Post } from "@/lib/dataProvider";
 
 type ApiPost = {
@@ -78,10 +79,10 @@ export const toPostRecord = (post: ApiPost): Post => ({
   id: post.id,
   clubId: post.club?.id || "general",
   clubName: post.club?.name?.trim() || "General",
-  clubLogo: post.club?.logoUrl?.trim() || "/globe.svg",
+  clubLogo: normalizeAssetUrl(post.club?.logoUrl, "/globe.svg") || "/globe.svg",
   author: post.author?.profile?.displayName?.trim() || "Anonymous",
   content: post.content,
-  image: post.imageUrl?.trim() || undefined,
+  image: normalizeAssetUrl(post.imageUrl) || undefined,
   timestamp: relativeTime(post.createdAt),
   likes: post.likesCount ?? 0,
   comments: [],

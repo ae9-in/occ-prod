@@ -8,6 +8,7 @@ import { joinClubOnApi, leaveClubOnApi } from "@/lib/clubApi";
 import { requestClubJoinOnApi } from "@/lib/clubApi";
 import { createPostOnApi, deletePostOnApi, listFeedFromApi, type PostUpsertInput, updatePostOnApi } from "@/lib/postApi";
 import { fetchCurrentUser, loginWithPassword, type SessionUser } from "@/lib/authApi";
+import { normalizeAssetUrl } from "@/lib/assetUrl";
 
 interface User extends SessionUser {}
 
@@ -36,13 +37,7 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-const normalizeAssetSrc = (value?: string | null, fallback?: string) => {
-  const trimmed = typeof value === "string" ? value.trim() : "";
-  if (trimmed && !trimmed.startsWith("blob:") && !trimmed.startsWith("file:") && !/^[a-zA-Z]:[\\/]/.test(trimmed)) {
-    return trimmed;
-  }
-  return fallback;
-};
+const normalizeAssetSrc = (value?: string | null, fallback?: string) => normalizeAssetUrl(value, fallback);
 
 const normalizeUserRecord = (value: User): User => ({
   ...value,
@@ -57,7 +52,7 @@ const normalizePostRecord = (value: Post): Post => ({
 
 const normalizeClubRecord = (value: ClubRecord): ClubRecord => ({
   ...value,
-  slug: normalizeAssetSrc(value.slug),
+  slug: value.slug,
   logo: normalizeAssetSrc(value.logo, "/globe.svg") || "/globe.svg",
   bannerImage: normalizeAssetSrc(value.bannerImage, "") || "",
   profileImage: normalizeAssetSrc(value.profileImage, normalizeAssetSrc(value.logo, "/globe.svg")) || "/globe.svg",

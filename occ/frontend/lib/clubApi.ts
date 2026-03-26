@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import { normalizeAssetUrl } from "@/lib/assetUrl";
 import type { ClubRecord } from "@/lib/mockData/clubs";
 
 export const CLUB_IMAGE_TYPES = [
@@ -70,7 +71,7 @@ const toTagline = (name: string, description: string) => {
 };
 
 export const toClubRecord = (club: ApiClub, fallbackCategory = "Community"): ClubRecord => {
-  const resolvedLogo = club.logoUrl?.trim() || "/globe.svg";
+  const resolvedLogo = normalizeAssetUrl(club.logoUrl, "/globe.svg") || "/globe.svg";
   const resolvedDescription = club.description?.trim() || "A new OCC club is taking shape.";
   const resolvedName = club.name?.trim() || "Untitled Club";
 
@@ -82,7 +83,7 @@ export const toClubRecord = (club: ApiClub, fallbackCategory = "Community"): Clu
     tagline: toTagline(resolvedName, resolvedDescription),
     fullDescription: resolvedDescription,
     logo: resolvedLogo,
-    bannerImage: club.bannerUrl?.trim() || "",
+    bannerImage: normalizeAssetUrl(club.bannerUrl, "") || "",
     profileImage: resolvedLogo,
     category: club.category?.name?.trim() || fallbackCategory,
     location: club.locationName?.trim() || "Campus Hub",

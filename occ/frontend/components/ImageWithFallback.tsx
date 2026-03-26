@@ -1,7 +1,8 @@
 "use client";
 
 import type { ImgHTMLAttributes } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { normalizeAssetUrl } from "@/lib/assetUrl";
 
 type ImageWithFallbackProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
   fallbackSrc: string;
@@ -9,10 +10,8 @@ type ImageWithFallbackProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> &
 };
 
 const isRenderableImageSrc = (value?: string | null) => {
-  const trimmed = typeof value === "string" ? value.trim() : "";
-  if (!trimmed) return false;
-  if (trimmed.startsWith("blob:") || trimmed.startsWith("file:")) return false;
-  return true;
+  const normalized = normalizeAssetUrl(value);
+  return !!normalized && !normalized.startsWith("blob:") && !normalized.startsWith("file:");
 };
 
 export default function ImageWithFallback({
@@ -21,11 +20,15 @@ export default function ImageWithFallback({
   src,
   ...props
 }: ImageWithFallbackProps) {
-  const initialSrc = useMemo(
-    () => (isRenderableImageSrc(src) ? src!.trim() : fallbackSrc),
+  const resolvedSrc = useMemo(
+    () => (isRenderableImageSrc(src) ? normalizeAssetUrl(src, fallbackSrc)! : fallbackSrc),
     [fallbackSrc, src],
   );
-  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [currentSrc, setCurrentSrc] = useState(resolvedSrc);
+
+  useEffect(() => {
+    setCurrentSrc(resolvedSrc);
+  }, [resolvedSrc]);
 
   return (
     <img
