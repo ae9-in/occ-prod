@@ -1,22 +1,28 @@
 import axios, { AxiosHeaders } from 'axios';
 
 function normalizeApiBase(url?: string) {
-  const fallback = 'http://localhost:5000/api';
+  const fallback = 'http://localhost:5000/api/v1';
   const value = (url || fallback).trim().replace(/\/+$/, '');
 
-  if (value.endsWith('/api')) {
+  if (value.includes('/api/v1')) {
     return value;
   }
 
-  return `${value}/api`;
+  if (value.endsWith('/api')) {
+    return `${value}/v1`;
+  }
+
+  return `${value}/api/v1`;
 }
 
 export const API_BASE = normalizeApiBase(process.env.NEXT_PUBLIC_API_URL);
 
-const API_URL = API_BASE;
-
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE,
+  timeout: 15000,
+  headers: {
+    Accept: 'application/json',
+  },
 });
 
 api.interceptors.request.use(
@@ -32,7 +38,6 @@ api.interceptors.request.use(
 
     config.headers = headers;
 
-    // Add token if exists
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       if (token) {
@@ -41,23 +46,21 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value: string) => void;
-  reject: (reason: any) => void;
+  reject: (reason: unknown) => void;
 }> = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
-    } else {
-      prom.resolve(token as string);
+    } else if (token) {
+      prom.resolve(token);
     }
   });
 
@@ -67,7 +70,7 @@ const processQueue = (error: any, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
@@ -79,12 +82,11 @@ api.interceptors.response.use(
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
+            originalRequest.headers = originalRequest.headers || {};
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return api(originalRequest);
           })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
@@ -94,10 +96,12 @@ api.interceptors.response.use(
         if (typeof window !== 'undefined') {
           const refreshToken = localStorage.getItem('refreshToken');
           if (refreshToken) {
-            // Use axios directly to avoid interceptor loop
-            const response = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
+            const response = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken }, {
+              headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+              timeout: 15000,
+            });
             const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-            
+
             localStorage.setItem('token', accessToken);
             if (newRefreshToken) {
               localStorage.setItem('refreshToken', newRefreshToken);
@@ -105,14 +109,13 @@ api.interceptors.response.use(
 
             processQueue(null, accessToken);
 
+            originalRequest.headers = originalRequest.headers || {};
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             return api(originalRequest);
           }
         }
       } catch (refreshError) {
         processQueue(refreshError, null);
-        
-        // Refresh token failed. Clear out local storage and redirect to login
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
@@ -126,7 +129,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

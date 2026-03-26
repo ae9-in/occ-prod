@@ -9,7 +9,7 @@ import { useRouter, usePathname } from "next/navigation";
 import ImageWithFallback from "@/components/ImageWithFallback";
 import ModalShell from "@/components/ModalShell";
 
-function PostCard({ post }: { post: Post }) {
+function PostCard({ post, onDeleted }: { post: Post; onDeleted?: (postId: string) => void }) {
   const { user, deletePost, updatePost, isLoggedIn } = useUser();
   const router = useRouter();
   const pathname = usePathname();
@@ -229,13 +229,14 @@ function PostCard({ post }: { post: Post }) {
     setIsDeleting(true);
     try {
       await deletePost(post.id);
+      onDeleted?.(post.id);
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error("Failed to delete post", error);
     } finally {
       setIsDeleting(false);
     }
-  }, [post.id, deletePost, isDeleting]);
+  }, [post.id, deletePost, isDeleting, onDeleted]);
 
   const handleReportPost = useCallback(() => {
     if (!isLoggedIn) {
@@ -579,3 +580,6 @@ function PostCard({ post }: { post: Post }) {
 }
 
 export default memo(PostCard);
+
+
+

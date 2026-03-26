@@ -97,6 +97,15 @@ export async function registerStudent(input: RegisterStudentInput) {
   };
 }
 
+export async function refreshSession(refreshToken: string) {
+  const response = await api.post<AuthEnvelope>("/auth/refresh", { refreshToken });
+  return {
+    user: mapApiUserToSessionUser(response.data.data.user),
+    accessToken: response.data.data.accessToken || "",
+    refreshToken: response.data.data.refreshToken || "",
+  };
+}
+
 export async function fetchCurrentUser() {
   const response = await api.get<AuthEnvelope>("/auth/me");
   return mapApiUserToSessionUser(response.data.data.user);

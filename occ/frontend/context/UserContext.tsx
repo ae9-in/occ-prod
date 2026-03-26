@@ -7,10 +7,10 @@ import { createClubOnApi, listClubsFromApi, toClubRecord, type ClubUpsertInput, 
 import { joinClubOnApi, leaveClubOnApi } from "@/lib/clubApi";
 import { requestClubJoinOnApi } from "@/lib/clubApi";
 import { createPostOnApi, deletePostOnApi, listFeedFromApi, type PostUpsertInput, updatePostOnApi } from "@/lib/postApi";
-import { fetchCurrentUser, loginWithPassword, type SessionUser } from "@/lib/authApi";
+import { fetchCurrentUser, loginWithPassword, refreshSession, type SessionUser } from "@/lib/authApi";
 import { normalizeAssetUrl } from "@/lib/assetUrl";
 
-interface User extends SessionUser {}
+type User = SessionUser;
 
 interface UserContextType {
   user: User | null;
@@ -87,6 +87,13 @@ const readStoredValue = <T,>(key: string, fallback: T, normalize?: (value: T) =>
   }
 };
 
+const clearStoredSession = () => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("occ-user");
+};
+
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() =>
     readStoredValue<User | null>("occ-user", null, (value) => (value ? normalizeUserRecord(value) : null)),
@@ -119,8 +126,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     let isActive = true;
 
     const bootstrapUser = async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      if (!token) {
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const storedRefreshToken = typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null;
+
+      if (!accessToken && !storedRefreshToken) {
         if (!isActive) return;
         localStorage.removeItem("occ-user");
         setUser(null);
@@ -128,17 +137,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const applySessionUser = (nextUser: User, access?: string, refresh?: string) => {
+        if (!isActive) return;
+        const normalizedUser = normalizeUserRecord(nextUser);
+        setUser(normalizedUser);
+        localStorage.setItem("occ-user", JSON.stringify(normalizedUser));
+        if (access) {
+          localStorage.setItem("token", access);
+        }
+        if (refresh) {
+          localStorage.setItem("refreshToken", refresh);
+        }
+      };
+
       try {
-        const currentUser = normalizeUserRecord(await fetchCurrentUser());
-        if (!isActive) return;
-        setUser(currentUser);
-        localStorage.setItem("occ-user", JSON.stringify(currentUser));
+        if (accessToken) {
+          const currentUser = normalizeUserRecord(await fetchCurrentUser());
+          applySessionUser(currentUser);
+        } else if (storedRefreshToken) {
+          const session = await refreshSession(storedRefreshToken);
+          applySessionUser(session.user, session.accessToken, session.refreshToken || storedRefreshToken);
+        }
       } catch {
-        if (!isActive) return;
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("occ-user");
-        setUser(null);
+        if (storedRefreshToken) {
+          try {
+            const session = await refreshSession(storedRefreshToken);
+            applySessionUser(session.user, session.accessToken, session.refreshToken || storedRefreshToken);
+          } catch {
+            if (!isActive) return;
+            clearStoredSession();
+            setUser(null);
+          }
+        } else {
+          if (!isActive) return;
+          clearStoredSession();
+          setUser(null);
+        }
       } finally {
         if (isActive) setIsAuthLoading(false);
       }
@@ -275,9 +309,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("occ-user");
+    clearStoredSession();
   };
 
   const updateUser = (userData: Partial<User>) => {
@@ -291,8 +323,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const addPost = async (postData: PostUpsertInput) => {
     try {
       const created = await createPostOnApi(postData);
-      setPosts(prev => [normalizePostRecord(created), ...prev]);
-      return created;
+      const normalizedCreated = normalizePostRecord(created);
+      setPosts(prev => [normalizedCreated, ...prev]);
+      return normalizedCreated;
     } catch {
       return null;
     }
@@ -309,8 +342,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         content: updatedPost.content,
         clubId: updatedPost.clubId === "general" ? null : updatedPost.clubId,
       });
-      setPosts(prev => prev.map(p => p.id === updated.id ? normalizePostRecord(updated) : p));
-      return updated;
+      const normalizedUpdated = normalizePostRecord(updated);
+      setPosts(prev => prev.map(p => p.id === updated.id ? normalizedUpdated : p));
+      return normalizedUpdated;
     } catch {
       return null;
     }
@@ -538,3 +572,4 @@ export function useUser() {
   }
   return context;
 }
+

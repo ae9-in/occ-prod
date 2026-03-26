@@ -12,6 +12,10 @@ import { listFeedFromApi } from "@/lib/postApi";
 export default function Home() {
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
 
+  const handleFeaturedPostDeleted = (postId: string) => {
+    setFeaturedPosts((prev) => prev.filter((post) => post.id !== postId));
+  };
+
   useEffect(() => {
     let isActive = true;
 
@@ -53,7 +57,7 @@ export default function Home() {
         <div className="space-y-12">
           {featuredPosts.length > 0 ? (
             featuredPosts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostCard key={post.id} post={post} onDeleted={handleFeaturedPostDeleted} />
             ))
           ) : (
             <div className="bg-white border-4 border-black p-10 shadow-[8px_8px_0_0_#000]">
@@ -103,3 +107,5 @@ export default function Home() {
     </div>
   );
 }
+
+

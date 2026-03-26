@@ -146,6 +146,10 @@ export default function FeedPage() {
     setShowFeedSettings(true);
   }, [feedSettings]);
 
+  const handleFeedPostDeleted = useCallback((postId: string) => {
+    setFeedPosts((prev) => prev.filter((post) => post.id !== postId));
+  }, []);
+
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore || currentPage >= totalPages) return;
 
@@ -322,7 +326,7 @@ export default function FeedPage() {
              <Info className="w-4 h-4"/> Feed Settings
            </button>
            <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">
-             {feedSettings.sortBy === "popular" ? "Popular first" : "Latest first"} · {feedSettings.showClubPosts ? "Club" : ""}{feedSettings.showClubPosts && feedSettings.showGeneralPosts ? " + " : ""}{feedSettings.showGeneralPosts ? "General" : ""}
+             {feedSettings.sortBy === "popular" ? "Popular first" : "Latest first"} - {feedSettings.showClubPosts ? "Club" : ""}{feedSettings.showClubPosts && feedSettings.showGeneralPosts ? " + " : ""}{feedSettings.showGeneralPosts ? "General" : ""}
            </p>
         </div>
       </div>
@@ -341,7 +345,7 @@ export default function FeedPage() {
           </div>
         ) : (
           feedPosts.map(post => (
-            <PostCard key={post.id} post={post} />
+            <PostCard key={post.id} post={post} onDeleted={handleFeedPostDeleted} />
           ))
         )}
       </div>
@@ -433,7 +437,7 @@ export default function FeedPage() {
                       <img
                         src={imagePreview}
                         alt="Preview"
-                        className="w-full max-h-64 object-cover border-4 border-black"
+                        className="w-full aspect-[4/3] object-contain border-4 border-black bg-[#eef3ff] p-3"
                       />
                       <button
                         type="button"
@@ -603,3 +607,6 @@ export default function FeedPage() {
     </div>
   );
 }
+
+
+
