@@ -16,6 +16,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "node scripts/prisma-deploy.js",
     "prisma:seed": "prisma db seed",
+    "images:sync-cloudinary": "node scripts/sync-post-images-to-cloudinary.js",
     "db:check": "node scripts/healthcheck.js --db-check",
     "loadtest": "node scripts/loadtest.js"
   },

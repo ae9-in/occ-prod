@@ -30,6 +30,22 @@ const parsed = envSchema.parse(process.env);
 const looksLikePlaceholderSecret = (value: string) =>
   /^replace-with/i.test(value) || /^changeme/i.test(value) || /^default/i.test(value);
 
+const hasCloudinaryUrl = !!parsed.CLOUDINARY_URL;
+const hasManualCloudinaryConfig = !!(
+  parsed.CLOUDINARY_CLOUD_NAME &&
+  parsed.CLOUDINARY_API_KEY &&
+  parsed.CLOUDINARY_API_SECRET
+);
+const hasPartialManualCloudinaryConfig = !!(
+  parsed.CLOUDINARY_CLOUD_NAME ||
+  parsed.CLOUDINARY_API_KEY ||
+  parsed.CLOUDINARY_API_SECRET
+);
+
+if (!hasCloudinaryUrl && hasPartialManualCloudinaryConfig && !hasManualCloudinaryConfig) {
+  throw new Error("Cloudinary config is incomplete. Set CLOUDINARY_URL or all CLOUDINARY_* values.");
+}
+
 if (parsed.NODE_ENV === "production") {
   if (parsed.JWT_ACCESS_SECRET.length < 32 || parsed.JWT_REFRESH_SECRET.length < 32) {
     throw new Error("JWT secrets must be at least 32 characters long in production");
@@ -41,6 +57,10 @@ if (parsed.NODE_ENV === "production") {
 
   if (parsed.ADMIN_PASSWORD === "admin123") {
     throw new Error("ADMIN_PASSWORD must be rotated from the default value before production deployment");
+  }
+
+  if (!hasCloudinaryUrl && !hasManualCloudinaryConfig) {
+    throw new Error("Cloudinary must be configured in production so uploaded images are not stored on local disk.");
   }
 }
 
