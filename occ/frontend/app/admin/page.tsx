@@ -365,10 +365,10 @@ export default function AdminPage() {
                           type="button"
                           onClick={() => void handleDeleteClub(item.id)}
                           disabled={isDeletingClub}
-                          className="inline-flex items-center gap-2 bg-red-500 text-white px-4 py-2 font-black uppercase text-xs border-2 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0_0_#000]"
+                          className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 font-black uppercase text-xs border-2 border-black shadow-[4px_4px_0_0_#1d2cf3] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0_0_#1d2cf3]"
                         >
                           <Trash2 className="w-4 h-4" />
-                          {isDeletingClub ? "Deleting..." : "Delete Club"}
+                          {isDeletingClub ? "Deleting..." : "Delete"}
                         </button>
                       </div>
                     </div>
@@ -406,3 +406,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
