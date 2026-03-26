@@ -37,6 +37,14 @@ services:
         sync: false
       - key: UPLOAD_DIR
         value: /var/data/uploads
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
     disk:
       name: uploads
       mountPath: /var/data

@@ -1,14 +1,48 @@
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "./env";
 
-const configured = !!(env.cloudinaryCloudName && env.cloudinaryApiKey && env.cloudinaryApiSecret);
+type CloudinaryCredentials = {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+};
 
-if (configured) {
+function parseCloudinaryUrl(value: string): CloudinaryCredentials | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "cloudinary:") {
+      return null;
+    }
+
+    return {
+      cloudName: decodeURIComponent(parsed.hostname),
+      apiKey: decodeURIComponent(parsed.username),
+      apiSecret: decodeURIComponent(parsed.password),
+    };
+  } catch {
+    return null;
+  }
+}
+
+const fromUrl = env.cloudinaryUrl ? parseCloudinaryUrl(env.cloudinaryUrl) : null;
+const credentials: CloudinaryCredentials | null = fromUrl || (
+  env.cloudinaryCloudName && env.cloudinaryApiKey && env.cloudinaryApiSecret
+    ? {
+        cloudName: env.cloudinaryCloudName,
+        apiKey: env.cloudinaryApiKey,
+        apiSecret: env.cloudinaryApiSecret,
+      }
+    : null
+);
+
+const configured = !!credentials;
+
+if (credentials) {
   cloudinary.config({
-    cloud_name: env.cloudinaryCloudName,
-    api_key: env.cloudinaryApiKey,
-    api_secret: env.cloudinaryApiSecret,
-    secure: true
+    cloud_name: credentials.cloudName,
+    api_key: credentials.apiKey,
+    api_secret: credentials.apiSecret,
+    secure: true,
   });
 }
 
