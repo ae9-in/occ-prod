@@ -4,6 +4,18 @@ import { ZodError } from "zod";
 import { logger } from "../lib/logger";
 import { HttpError } from "../lib/httpError";
 
+function getGenericStatusCode(error: unknown) {
+  if (!error || typeof error !== "object") return null;
+
+  const candidate = "statusCode" in error
+    ? (error as { statusCode?: unknown }).statusCode
+    : "status" in error
+      ? (error as { status?: unknown }).status
+      : null;
+
+  return typeof candidate === "number" && candidate >= 400 && candidate <= 599 ? candidate : null;
+}
+
 export function errorHandler(error: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (error instanceof ZodError) {
     return res.status(400).json({
@@ -34,7 +46,7 @@ export function errorHandler(error: unknown, _req: Request, res: Response, _next
     });
   }
 
-  const statusCode = error instanceof HttpError ? error.statusCode : 500;
+  const statusCode = error instanceof HttpError ? error.statusCode : getGenericStatusCode(error) || 500;
   const message = statusCode >= 500 ? "Internal server error" : error instanceof Error ? error.message : "Internal server error";
   const errors = error instanceof HttpError ? error.errors : [];
 

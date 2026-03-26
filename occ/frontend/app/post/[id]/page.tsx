@@ -199,7 +199,7 @@ export default function PostPage({ params }: PostPageProps) {
             <p className="text-2xl md:text-3xl font-black uppercase leading-tight text-black border-l-4 border-brutal-blue pl-6 py-2">{resolvedPost.content}</p>
             {safePostImage ? (
               <div className="border-4 border-black bg-[#eef3ff] shadow-[6px_6px_0_0_#000] aspect-[4/3] overflow-hidden">
-                <ImageWithFallback src={safePostImage} fallbackSrc="/window.svg" hideOnError alt="Post visual" className="w-full h-full object-contain p-4" />
+                <ImageWithFallback src={safePostImage} fallbackSrc="/window.svg" alt="Post visual" className="w-full h-full object-contain p-4" />
               </div>
             ) : null}
           </div>

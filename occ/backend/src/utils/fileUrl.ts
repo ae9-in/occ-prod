@@ -18,6 +18,22 @@ function buildLocalUploadUrl(file?: Express.Multer.File) {
   return normalizeUrl(relativePath);
 }
 
+export function isCloudinaryUrl(value?: string | null) {
+  return !!value && /^https?:\/\/res\.cloudinary\.com\//i.test(value);
+}
+
+async function uploadSourceToCloudinary(source: string, folder: string) {
+  const result = await cloudinary.uploader.upload(source, {
+    folder,
+    resource_type: "image",
+    use_filename: true,
+    unique_filename: true,
+    overwrite: false
+  });
+
+  return result.secure_url || result.url || null;
+}
+
 export async function fileToPublicUrl(
   file?: Express.Multer.File,
   folder = "occ"
@@ -29,16 +45,16 @@ export async function fileToPublicUrl(
   }
 
   try {
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder,
-      resource_type: "image",
-      use_filename: true,
-      unique_filename: true,
-      overwrite: false
-    });
-
-    return result.secure_url || result.url || null;
+    return await uploadSourceToCloudinary(file.path, folder);
   } finally {
     await fs.unlink(file.path).catch(() => undefined);
   }
+}
+
+export async function publicUrlToCloudinary(url: string, folder = "occ") {
+  const normalized = normalizeUrl(url);
+  if (!normalized) return null;
+  if (isCloudinaryUrl(normalized)) return normalized;
+  if (!isCloudinaryConfigured) return normalized;
+  return uploadSourceToCloudinary(normalized, folder);
 }
