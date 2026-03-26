@@ -3,7 +3,7 @@ import { requireAuth } from "../middleware/auth";
 import { upload } from "../config/upload";
 import { asyncHandler } from "../utils/asyncHandler";
 import { successResponse } from "../utils/response";
-import { fileToRelativeUrl } from "../utils/fileUrl";
+import { fileToPublicUrl } from "../utils/fileUrl";
 import { HttpError } from "../lib/httpError";
 
 const router = Router();
@@ -17,7 +17,7 @@ router.post(
     return successResponse(res, "Post image uploaded successfully", {
       file: {
         originalName: req.file.originalname,
-        url: fileToRelativeUrl(req.file)
+        url: await fileToPublicUrl(req.file, "occ/posts")
       }
     });
   })
@@ -32,7 +32,7 @@ router.post(
     return successResponse(res, "Club logo uploaded successfully", {
       file: {
         originalName: req.file.originalname,
-        url: fileToRelativeUrl(req.file)
+        url: await fileToPublicUrl(req.file, "occ/clubs/logo")
       }
     });
   })
@@ -47,7 +47,7 @@ router.post(
     return successResponse(res, "Profile image uploaded successfully", {
       file: {
         originalName: req.file.originalname,
-        url: fileToRelativeUrl(req.file)
+        url: await fileToPublicUrl(req.file, "occ/profiles/avatar")
       }
     });
   })

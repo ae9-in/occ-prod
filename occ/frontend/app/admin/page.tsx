@@ -1,7 +1,7 @@
 "use client";
 
-import { type ComponentType, useCallback, useEffect, useState } from "react";
-import { Shield, Users, Building2, FileText, AlertTriangle, LogOut, ArrowRight } from "lucide-react";
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
+import { Shield, Users, Building2, FileText, AlertTriangle, LogOut, ArrowRight, Trash2 } from "lucide-react";
 import PublicPageGrid from "@/components/PublicPageGrid";
 import api from "@/lib/api";
 import { useUser } from "@/context/UserContext";
@@ -100,6 +100,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [clubs, setClubs] = useState<AdminClubItem[]>([]);
   const [posts, setPosts] = useState<AdminPostItem[]>([]);
+  const [clubActionState, setClubActionState] = useState<Record<string, boolean>>({});
 
   const hasAdminAccess = user?.role === "SUPER_ADMIN" || user?.role === "PLATFORM_ADMIN";
 
@@ -154,6 +155,29 @@ export default function AdminPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleDeleteClub = useCallback(async (clubId: string) => {
+    const confirmed = typeof window === "undefined"
+      ? true
+      : window.confirm("Delete this club permanently? This action cannot be undone.");
+
+    if (!confirmed) return;
+
+    setClubActionState((prev) => ({ ...prev, [clubId]: true }));
+    setError("");
+
+    try {
+      await api.delete(`/admin/clubs/${clubId}`);
+      setClubs((prev) => prev.filter((club) => club.id !== clubId));
+      setStats((prev) => ({ ...prev, clubsCount: Math.max(0, prev.clubsCount - 1) }));
+    } catch {
+      setError("Unable to delete that club right now.");
+    } finally {
+      setClubActionState((prev) => ({ ...prev, [clubId]: false }));
+    }
+  }, []);
+
+  const clubCountLabel = useMemo(() => `${clubs.length} loaded`, [clubs.length]);
 
   if (isAuthLoading) {
     return (
@@ -317,20 +341,39 @@ export default function AdminPage() {
           </div>
 
           <div className="bg-white border-4 border-black p-8 shadow-[8px_8px_0_0_#000]">
-            <h3 className="text-2xl font-black uppercase tracking-tighter border-b-4 border-black pb-4">Clubs</h3>
+            <div className="flex items-end justify-between gap-4 border-b-4 border-black pb-4">
+              <div>
+                <h3 className="text-2xl font-black uppercase tracking-tighter">Clubs</h3>
+                <p className="mt-2 text-xs font-black uppercase tracking-[0.15em] text-black/50">{clubCountLabel}</p>
+              </div>
+            </div>
             <div className="mt-6 space-y-3">
               {clubs.length > 0 ? (
-                clubs.map((item) => (
-                  <div key={item.id} className="border-2 border-black bg-brutal-gray p-4">
-                    <p className="font-black text-black">{item.name}</p>
-                    <p className="mt-2 text-sm font-bold text-black/60">
-                      {(item.category?.name || "Uncategorized")} | {item.visibility || "PUBLIC"}
-                    </p>
-                    <p className="mt-2 text-xs font-black uppercase tracking-[0.15em] text-black/50">
-                      {item.memberCount || 0} members | {item.postCount || 0} posts
-                    </p>
-                  </div>
-                ))
+                clubs.map((item) => {
+                  const isDeletingClub = !!clubActionState[item.id];
+                  return (
+                    <div key={item.id} className="border-2 border-black bg-brutal-gray p-4">
+                      <p className="font-black text-black">{item.name}</p>
+                      <p className="mt-2 text-sm font-bold text-black/60">
+                        {(item.category?.name || "Uncategorized")} | {item.visibility || "PUBLIC"}
+                      </p>
+                      <p className="mt-2 text-xs font-black uppercase tracking-[0.15em] text-black/50">
+                        {item.memberCount || 0} members | {item.postCount || 0} posts
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteClub(item.id)}
+                          disabled={isDeletingClub}
+                          className="inline-flex items-center gap-2 bg-red-500 text-white px-4 py-2 font-black uppercase text-xs border-2 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0_0_#000]"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {isDeletingClub ? "Deleting..." : "Delete Club"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               ) : (
                 <EmptyState title="No clubs in database" description="Create clubs from the real app flow and they will appear here." />
               )}

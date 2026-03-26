@@ -9,7 +9,7 @@ import { successResponse, paginatedResponse } from "../utils/response";
 import { parsePagination } from "../utils/pagination";
 import { serializeClub, serializePost, serializeUser } from "../utils/serializers";
 import { upload } from "../config/upload";
-import { fileToRelativeUrl } from "../utils/fileUrl";
+import { fileToPublicUrl } from "../utils/fileUrl";
 import { ensureUniqueSlug } from "../utils/slug";
 import { HttpError } from "../lib/httpError";
 import { getClubAccess } from "../middleware/requireRole";
@@ -184,6 +184,8 @@ router.post(
     const slug = await ensureUniqueSlug(prisma.club, req.body.name);
     const logo = files?.logo?.[0];
     const banner = files?.banner?.[0];
+    const logoUrl = await fileToPublicUrl(logo, "occ/clubs/logo");
+    const bannerUrl = await fileToPublicUrl(banner, "occ/clubs/banner");
 
     const club = await prisma.club.create({
       data: {
@@ -195,8 +197,8 @@ router.post(
         locationName: req.body.locationName || null,
         latitude: req.body.latitude ?? null,
         longitude: req.body.longitude ?? null,
-        logoUrl: fileToRelativeUrl(logo),
-        bannerUrl: fileToRelativeUrl(banner) || req.body.bannerUrl || null,
+        logoUrl,
+        bannerUrl: bannerUrl || req.body.bannerUrl || null,
         visibility: req.body.visibility || "PUBLIC",
         ownerId: req.user!.id,
         members: {
@@ -257,6 +259,8 @@ router.patch(
     const resolvedClubId = await getResolvedClubId(req.params.id);
     await ensureClubOwner(resolvedClubId, req.user!);
     const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const nextLogoUrl = await fileToPublicUrl(files?.logo?.[0], "occ/clubs/logo");
+    const nextBannerUrl = await fileToPublicUrl(files?.banner?.[0], "occ/clubs/banner");
     const club = await prisma.club.update({
       where: { id: resolvedClubId },
       data: {
@@ -268,10 +272,10 @@ router.patch(
         latitude: req.body.latitude,
         longitude: req.body.longitude,
         visibility: req.body.visibility,
-        logoUrl: req.body.removeLogo ? null : fileToRelativeUrl(files?.logo?.[0]) || undefined,
+        logoUrl: req.body.removeLogo ? null : nextLogoUrl || undefined,
         bannerUrl: req.body.removeBanner
           ? null
-          : fileToRelativeUrl(files?.banner?.[0]) || req.body.bannerUrl || undefined
+          : nextBannerUrl || req.body.bannerUrl || undefined
       },
       include: {
         category: true,

@@ -17,7 +17,10 @@ const envSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   ADMIN_EMAIL: z.string().email(),
   ADMIN_PASSWORD: z.string().min(8),
-  UPLOAD_DIR: z.string().default("./uploads")
+  UPLOAD_DIR: z.string().default("./uploads"),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional()
 });
 
 const parsed = envSchema.parse(process.env);
@@ -52,7 +55,10 @@ export const env = {
   appUrl: parsed.APP_URL,
   adminEmail: parsed.ADMIN_EMAIL,
   adminPassword: parsed.ADMIN_PASSWORD,
-  uploadDir: parsed.UPLOAD_DIR
+  uploadDir: parsed.UPLOAD_DIR,
+  cloudinaryCloudName: parsed.CLOUDINARY_CLOUD_NAME || "",
+  cloudinaryApiKey: parsed.CLOUDINARY_API_KEY || "",
+  cloudinaryApiSecret: parsed.CLOUDINARY_API_SECRET || ""
 };
 
 export type AppEnv = typeof env;

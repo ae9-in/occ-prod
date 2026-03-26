@@ -8,6 +8,309 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id                                                    String               @id @default(cuid())
+  email                                                 String               @unique
+  passwordHash                                          String
+  role                                                  UserRole             @default(USER)
+  status                                                UserStatus           @default(ACTIVE)
+  isActive                                              Boolean              @default(true)
+  createdAt                                             DateTime             @default(now())
+  updatedAt                                             DateTime             @updatedAt
+  adminActionLogs                                       AdminActionLog[]
+  clubsOwned                                            Club[]
+  Club_Club_reviewedByAdminIdToUser                     Club[]               @relation("Club_reviewedByAdminIdToUser")
+  joinRequests                                          ClubJoinRequest[]
+  memberships                                           ClubMember[]
+  comments                                              Comment[]
+  GigApplication_GigApplication_reviewedByAdminIdToUser GigApplication[]     @relation("GigApplication_reviewedByAdminIdToUser")
+  GigApplication_GigApplication_userIdToUser            GigApplication[]     @relation("GigApplication_userIdToUser")
+  likes                                                 Like[]
+  PasswordResetToken                                    PasswordResetToken[]
+  posts                                                 Post[]
+  privacy                                               PrivacySetting?
+  profile                                               Profile?
+  refreshTokens                                         RefreshToken[]
+  reportsMade                                           Report[]             @relation("reportsMade")
+  reviewedReports                                       Report[]             @relation("reportsReviewed")
+  shares                                                Share[]
+  settings                                              UserSetting?
+
+  @@index([role])
+  @@index([status])
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  displayName String
+  bio         String?
+  university  String?
+  avatarUrl   String?
+  coverUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  hobbies     String?
+  phoneNumber String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  clubs     Club[]
+}
+
+model Club {
+  id                                String             @id @default(cuid())
+  name                              String
+  slug                              String             @unique
+  description                       String
+  categoryId                        String?
+  university                        String?
+  locationName                      String?
+  latitude                          Float?
+  longitude                         Float?
+  logoUrl                           String?
+  bannerUrl                         String?
+  visibility                        ClubVisibility     @default(PUBLIC)
+  ownerId                           String
+  createdAt                         DateTime           @default(now())
+  updatedAt                         DateTime           @updatedAt
+  isActive                          Boolean            @default(true)
+  approvalStatus                    ClubApprovalStatus @default(PENDING)
+  isVerified                        Boolean            @default(false)
+  rejectionReason                   String?
+  reviewedAt                        DateTime?
+  reviewedByAdminId                 String?
+  category                          Category?          @relation(fields: [categoryId], references: [id])
+  owner                             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  User_Club_reviewedByAdminIdToUser User?              @relation("Club_reviewedByAdminIdToUser", fields: [reviewedByAdminId], references: [id])
+  joinRequests                      ClubJoinRequest[]
+  members                           ClubMember[]
+  posts                             Post[]
+
+  @@index([slug])
+  @@index([university])
+  @@index([approvalStatus, isActive])
+}
+
+model ClubMember {
+  id             String         @id @default(cuid())
+  clubId         String
+  userId         String
+  membershipRole MembershipRole @default(MEMBER)
+  joinedAt       DateTime       @default(now())
+  club           Club           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  @@index([userId])
+  @@index([clubId])
+}
+
+model ClubJoinRequest {
+  id        String            @id @default(cuid())
+  clubId    String
+  userId    String
+  status    JoinRequestStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  club      Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  @@index([clubId])
+  @@index([userId])
+}
+
+model Post {
+  id               String           @id @default(cuid())
+  authorId         String
+  clubId           String?
+  content          String
+  imageUrl         String?
+  visibility       PostVisibility   @default(PUBLIC)
+  moderationStatus ModerationStatus @default(PUBLISHED)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  comments         Comment[]
+  likes            Like[]
+  author           User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  club             Club?            @relation(fields: [clubId], references: [id])
+  reports          Report[]
+  shares           Share[]
+
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([deletedAt, createdAt])
+  @@index([authorId])
+  @@index([clubId])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  parentId  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+model Share {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+}
+
+model Report {
+  id                String       @id @default(cuid())
+  postId            String
+  reporterId        String
+  reason            String
+  description       String?
+  status            ReportStatus @default(PENDING)
+  reviewedByAdminId String?
+  reviewedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  post              Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter          User         @relation("reportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewedByAdmin   User?        @relation("reportsReviewed", fields: [reviewedByAdminId], references: [id])
+
+  @@index([status])
+}
+
+model UserSetting {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  themePreference         String   @default("system")
+  notificationPreferences Json     @default("{}")
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PrivacySetting {
+  id                    String            @id @default(cuid())
+  userId                String            @unique
+  profileVisibility     ProfileVisibility @default(PUBLIC)
+  showUniversity        Boolean           @default(true)
+  showClubMembership    Boolean           @default(true)
+  postVisibilityDefault PostVisibility    @default(PUBLIC)
+  updatedAt             DateTime          @updatedAt
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminActionLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  actionType String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+model Gig {
+  id               String           @id
+  title            String
+  slug             String           @unique
+  shortDescription String
+  fullDescription  String
+  category         String
+  pricing          String?
+  instructions     String?
+  requirements     String?
+  bannerUrl        String?
+  isActive         Boolean          @default(true)
+  isPublic         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  GigApplication   GigApplication[]
+
+  @@index([category])
+  @@index([isActive, isPublic])
+  @@index([slug])
+}
+
+model GigApplication {
+  id                                          String               @id
+  userId                                      String?
+  gigId                                       String
+  name                                        String
+  email                                       String
+  phone                                       String
+  college                                     String
+  reason                                      String
+  relevantExperience                          String?
+  status                                      GigApplicationStatus @default(PENDING)
+  reviewedByAdminId                           String?
+  reviewedAt                                  DateTime?
+  createdAt                                   DateTime             @default(now())
+  updatedAt                                   DateTime
+  Gig                                         Gig                  @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  User_GigApplication_reviewedByAdminIdToUser User?                @relation("GigApplication_reviewedByAdminIdToUser", fields: [reviewedByAdminId], references: [id])
+  User_GigApplication_userIdToUser            User?                @relation("GigApplication_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, gigId])
+  @@index([email, gigId])
+  @@index([gigId, status])
+  @@index([userId, status])
+}
+
+model PasswordResetToken {
+  id        String    @id
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
 enum UserRole {
   USER
   CLUB_ADMIN
@@ -64,233 +367,14 @@ enum ProfileVisibility {
   PRIVATE
 }
 
-model User {
-  id              String           @id @default(cuid())
-  email           String           @unique
-  passwordHash    String
-  role            UserRole         @default(USER)
-  status          UserStatus       @default(ACTIVE)
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  profile         Profile?
-  refreshTokens   RefreshToken[]
-  clubsOwned      Club[]
-  memberships     ClubMember[]
-  joinRequests    ClubJoinRequest[]
-  posts           Post[]
-  comments        Comment[]
-  likes           Like[]
-  shares          Share[]
-  reportsMade     Report[]         @relation("reportsMade")
-  reviewedReports Report[]         @relation("reportsReviewed")
-  settings        UserSetting?
-  privacy         PrivacySetting?
-  adminActionLogs AdminActionLog[]
-
-  @@index([role])
-  @@index([status])
+enum ClubApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
-model Profile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  displayName String
-  bio         String?
-  university  String?
-  phoneNumber String?
-  hobbies     String?
-  avatarUrl   String?
-  coverUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model Category {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  clubs     Club[]
-}
-
-model Club {
-  id           String         @id @default(cuid())
-  name         String
-  slug         String         @unique
-  description  String
-  categoryId   String?
-  university   String?
-  locationName String?
-  latitude     Float?
-  longitude    Float?
-  logoUrl      String?
-  bannerUrl    String?
-  visibility   ClubVisibility @default(PUBLIC)
-  ownerId      String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  members      ClubMember[]
-  joinRequests ClubJoinRequest[]
-  posts        Post[]
-
-  @@index([slug])
-  @@index([university])
-}
-
-model ClubMember {
-  id             String         @id @default(cuid())
-  clubId         String
-  userId         String
-  membershipRole MembershipRole @default(MEMBER)
-  joinedAt       DateTime       @default(now())
-  club           Club           @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([clubId, userId])
-  @@index([userId])
-  @@index([clubId])
-}
-
-model ClubJoinRequest {
-  id        String            @id @default(cuid())
-  clubId    String
-  userId    String
-  status    JoinRequestStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  club      Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([clubId, userId])
-  @@index([clubId])
-  @@index([userId])
-}
-
-model Post {
-  id               String           @id @default(cuid())
-  authorId         String
-  clubId           String?
-  content          String
-  imageUrl         String?
-  visibility       PostVisibility   @default(PUBLIC)
-  moderationStatus ModerationStatus @default(PUBLISHED)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  deletedAt        DateTime?
-  author           User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  club             Club?            @relation(fields: [clubId], references: [id], onDelete: SetNull)
-  comments         Comment[]
-  likes            Like[]
-  shares           Share[]
-  reports          Report[]
-
-  @@index([createdAt])
-  @@index([deletedAt])
-  @@index([deletedAt, createdAt])
-  @@index([authorId])
-  @@index([clubId])
-}
-
-model Comment {
-  id        String    @id @default(cuid())
-  postId    String
-  authorId  String
-  content   String
-  parentId  String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
-  replies   Comment[] @relation("CommentReplies")
-
-  @@index([postId])
-}
-
-model Like {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, userId])
-  @@index([postId])
-  @@index([userId])
-}
-
-model Share {
-  id        String   @id @default(cuid())
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([postId])
-  @@index([userId])
-}
-
-model Report {
-  id                String       @id @default(cuid())
-  postId            String
-  reporterId        String
-  reason            String
-  description       String?
-  status            ReportStatus @default(PENDING)
-  reviewedByAdminId String?
-  reviewedAt        DateTime?
-  createdAt         DateTime     @default(now())
-  post              Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
-  reporter          User         @relation("reportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
-  reviewedByAdmin   User?        @relation("reportsReviewed", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
-
-  @@index([status])
-}
-
-model UserSetting {
-  id                      String   @id @default(cuid())
-  userId                  String   @unique
-  themePreference         String   @default("system")
-  notificationPreferences Json     @default("{}")
-  updatedAt               DateTime @updatedAt
-  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model PrivacySetting {
-  id                  String            @id @default(cuid())
-  userId              String            @unique
-  profileVisibility   ProfileVisibility @default(PUBLIC)
-  showUniversity      Boolean           @default(true)
-  showClubMembership  Boolean           @default(true)
-  postVisibilityDefault PostVisibility  @default(PUBLIC)
-  updatedAt           DateTime          @updatedAt
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model AdminActionLog {
-  id         String   @id @default(cuid())
-  adminId    String
-  actionType String
-  targetType String
-  targetId   String
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+enum GigApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

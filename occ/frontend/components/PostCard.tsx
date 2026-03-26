@@ -25,6 +25,7 @@ function PostCard({ post }: { post: Post }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editForm, setEditForm] = useState({
     content: post.content,
     image: post.image
@@ -33,6 +34,9 @@ function PostCard({ post }: { post: Post }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isAuthor = user?.name === post.author;
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "PLATFORM_ADMIN";
+  const canDeletePost = isAuthor || isAdmin;
+  const canEditPost = isAuthor;
   const safeClubLogo = post.clubLogo || "/globe.svg";
   const safePostImage = post.image?.trim() || null;
 
@@ -220,10 +224,18 @@ function PostCard({ post }: { post: Post }) {
     setShowMenu(false);
   }, [isLoggedIn, redirectToLogin]);
 
-  const confirmDelete = useCallback(() => {
-    deletePost(post.id);
-    setShowDeleteConfirm(false);
-  }, [post.id, deletePost]);
+  const confirmDelete = useCallback(async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deletePost(post.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error("Failed to delete post", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [post.id, deletePost, isDeleting]);
 
   const handleReportPost = useCallback(() => {
     if (!isLoggedIn) {
@@ -246,7 +258,7 @@ function PostCard({ post }: { post: Post }) {
   }, [reportReason, isLoggedIn, redirectToLogin]);
 
   return (
-    <div className="relative isolate bg-white border-4 border-black p-6 md:p-8 flex flex-col gap-4 shadow-[6px_6px_0_0_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0_0_#1d2cf3] transition-all group overflow-hidden">
+    <div className="relative isolate overflow-visible bg-white border-4 border-black p-6 md:p-8 flex flex-col gap-4 shadow-[6px_6px_0_0_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0_0_#1d2cf3] transition-all group">
       {/* Post Header */}
       <div className="flex justify-between items-center mb-2">
         <button
@@ -284,22 +296,35 @@ function PostCard({ post }: { post: Post }) {
             
             {showMenu && (
               <div className="absolute right-0 top-full mt-2 bg-white border-4 border-black shadow-[6px_6px_0_0_#000] z-50 min-w-[160px]">
-                {isAuthor ? (
+                {canEditPost || canDeletePost ? (
                   <>
-                    <button
-                      onClick={handleEditPost}
-                      className="w-full px-4 py-3 text-left font-black uppercase text-sm hover:bg-brutal-gray transition-colors flex items-center gap-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Edit Post
-                    </button>
-                    <button
-                      onClick={handleDeletePost}
-                      className="w-full px-4 py-3 text-left font-black uppercase text-sm hover:bg-brutal-gray transition-colors flex items-center gap-2 text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Post
-                    </button>
+                    {canEditPost && (
+                      <button
+                        onClick={handleEditPost}
+                        className="w-full px-4 py-3 text-left font-black uppercase text-sm hover:bg-brutal-gray transition-colors flex items-center gap-2"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Edit Post
+                      </button>
+                    )}
+                    {canDeletePost && (
+                      <button
+                        onClick={handleDeletePost}
+                        className="w-full px-4 py-3 text-left font-black uppercase text-sm hover:bg-brutal-gray transition-colors flex items-center gap-2 text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Post
+                      </button>
+                    )}
+                    {!canEditPost && (
+                      <button
+                        onClick={handleReportPost}
+                        className="w-full px-4 py-3 text-left font-black uppercase text-sm hover:bg-brutal-gray transition-colors flex items-center gap-2"
+                      >
+                        <Flag className="w-4 h-4" />
+                        Report Post
+                      </button>
+                    )}
                   </>
                 ) : (
                   <button
@@ -475,9 +500,10 @@ function PostCard({ post }: { post: Post }) {
               <div className="flex gap-4">
                 <button
                   onClick={confirmDelete}
-                  className="flex-1 bg-red-500 text-white px-6 py-3 font-black uppercase border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"
+                  disabled={isDeleting}
+                  className="flex-1 bg-red-500 text-white px-6 py-3 font-black uppercase border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0_0_#000]"
                 >
-                  Delete
+                  {isDeleting ? "Deleting..." : "Delete"}
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(false)}

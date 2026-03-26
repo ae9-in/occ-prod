@@ -9,7 +9,7 @@ import { successResponse, paginatedResponse } from "../utils/response";
 import { parsePagination } from "../utils/pagination";
 import { serializeClub, serializePost, serializeUser } from "../utils/serializers";
 import { upload } from "../config/upload";
-import { fileToRelativeUrl } from "../utils/fileUrl";
+import { fileToPublicUrl } from "../utils/fileUrl";
 
 const router = Router();
 
@@ -58,7 +58,7 @@ router.patch(
   upload.single("avatar"),
   validate(updateMeSchema),
   asyncHandler(async (req, res) => {
-    const avatarUrl = fileToRelativeUrl(req.file || undefined);
+    const avatarUrl = await fileToPublicUrl(req.file || undefined, "occ/profiles/avatar");
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data: {

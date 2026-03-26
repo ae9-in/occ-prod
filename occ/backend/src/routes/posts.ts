@@ -10,9 +10,9 @@ import { parsePagination } from "../utils/pagination";
 import { successResponse, paginatedResponse } from "../utils/response";
 import { serializeComment, serializePost } from "../utils/serializers";
 import { upload } from "../config/upload";
-import { fileToRelativeUrl } from "../utils/fileUrl";
+import { fileToPublicUrl } from "../utils/fileUrl";
 
-const router = Router();
+const router = Router(); 
 
 const emptyStringToUndefined = (value: unknown) => {
   if (typeof value === "string" && value.trim() === "") {
@@ -219,7 +219,7 @@ router.post(
   upload.single("image"),
   validate(postSchema),
   asyncHandler(async (req, res) => {
-    const uploadedImageUrl = fileToRelativeUrl(req.file || undefined);
+    const uploadedImageUrl = await fileToPublicUrl(req.file || undefined, "occ/posts");
     const imageUrl = uploadedImageUrl || req.body.imageUrl || null;
 
     if (req.body.clubId) {
@@ -283,7 +283,7 @@ router.patch(
       throw new HttpError(403, "You can only edit your own posts");
     }
 
-    const uploadedImageUrl = fileToRelativeUrl(req.file || undefined);
+    const uploadedImageUrl = await fileToPublicUrl(req.file || undefined, "occ/posts");
     const post = await prisma.post.update({
       where: { id: req.params.id },
       data: {
