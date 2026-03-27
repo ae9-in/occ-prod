@@ -8,7 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "render:build": "npm i --legacy-peer-deps && npm run prisma:generate && npm run build",
+    "render:build": "npm i --include=dev --legacy-peer-deps && npm run prisma:generate && npm run build",
     "render:start": "npm run prisma:deploy && node dist/server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
