@@ -4,7 +4,11 @@ function normalizeApiBase(url?: string) {
   const fallback = 'http://localhost:5000/api';
   const value = (url || fallback).trim().replace(/\/+$/, '');
 
-  if (value.endsWith('/api')) {
+  if (/^postgres(ql)?:\/\//i.test(value)) {
+    return fallback;
+  }
+
+  if (value.endsWith('/api') || value.endsWith('/api/v1')) {
     return value;
   }
 

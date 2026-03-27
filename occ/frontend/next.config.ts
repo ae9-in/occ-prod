@@ -1,6 +1,28 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+function resolveApiOrigin() {
+  const fallback = "http://localhost:5000";
+  const raw = (process.env.NEXT_PUBLIC_API_URL || fallback).trim();
+
+  try {
+    if (/^postgres(ql)?:\/\//i.test(raw)) {
+      return fallback;
+    }
+
+    const normalized = raw.endsWith("/api/v1")
+      ? raw.slice(0, -7)
+      : raw.endsWith("/api")
+        ? raw.slice(0, -4)
+        : raw;
+    return new URL(normalized).origin;
+  } catch {
+    return fallback;
+  }
+}
+
+const apiOrigin = resolveApiOrigin();
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   outputFileTracingRoot: path.join(__dirname),
@@ -24,7 +46,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://occ-prod.onrender.com",
+              `connect-src 'self' ${apiOrigin}`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'"
