@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 function resolveApiOrigin() {
   const fallback = "http://localhost:5000";
@@ -25,10 +24,6 @@ const apiOrigin = resolveApiOrigin();
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  outputFileTracingRoot: path.join(__dirname),
-  turbopack: {
-    root: path.join(__dirname),
-  },
   async headers() {
     return [
       {
